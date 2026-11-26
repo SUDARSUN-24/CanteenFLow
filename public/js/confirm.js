@@ -17,7 +17,7 @@
     root.replaceChildren(el('div', { class: 'empty-state', style: 'margin-top:16px' },
       el('div', { class: 'big', 'aria-hidden': 'true' }, '🔎'),
       el('p', {}, el('strong', {}, message)),
-      el('p', { class: 'muted' }, 'Order numbers look like CF-7K3QXM.'),
+      el('p', { class: 'muted' }, 'Order numbers look like CF-7K3QXM. The live demo keeps orders only while its server is running, so an older order from another device may be gone. Orders placed on this device are always kept here.'),
       el('a', { class: 'btn', href: '/orders' }, 'My orders'), ' ', el('a', { class: 'btn btn-ghost', href: '/' }, 'Browse stalls')));
   }
 
@@ -129,7 +129,7 @@
     lastStatus = st.status;
   }
 
-  /** Refresh from the server (the source of truth when it still has the order). */
+  /** Look the order up on the server (used for orders placed on another device). */
   async function sync() {
     const { ok, data } = await api(`/api/orders/${encodeURIComponent(number)}`);
     if (ok && data.order) {
@@ -141,17 +141,17 @@
 
   async function start() {
     if (!/^CF-[A-Z0-9]{6}$/.test(number)) return notFound('That is not a valid order number.');
+    // Orders placed on this device are saved here, and their status comes from
+    // the shared timer rules, so no server call is needed. Only an order from
+    // another device is looked up on the server.
     order = myOrders.find(number);
     if (!order) {
       await sync();
       if (!order) return notFound(`Order ${number} was not found.`);
-    } else {
-      sync(); // update quietly in the background
     }
     render();
     tick();
     setInterval(tick, 1000);
-    setInterval(sync, 20000);
   }
   start();
 })();

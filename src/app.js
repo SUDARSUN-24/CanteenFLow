@@ -21,6 +21,8 @@ function createApp(db, { now = () => Date.now() } = {}) {
   // when the student switches on the demo clock, e.g. to try lunchtime at night.
   const clockFor = (req) => Schedule.clockAt(now() + Schedule.safeOffset(req.get('X-Clock-Offset')));
 
+  const coverStmt = db.prepare('SELECT image FROM menu_items WHERE stall_id = ? ORDER BY menu_item_id LIMIT 1');
+
   /** Stall + live state, as shown on the list and menu pages. */
   function present(stall, clock, slots) {
     const st = Schedule.stallState(stall, clock);
@@ -32,6 +34,7 @@ function createApp(db, { now = () => Date.now() } = {}) {
       state: st.state, stateText: st.text, isOpenNow: st.isOpenNow,
       // Can a student order right now? Open now, or opening later today (pre-order), with a slot left.
       acceptsOrders: (st.state === 'open' || st.state === 'opens_later') && open.length > 0,
+      cover: coverStmt.get(stall.id)?.image ?? '/img/rice.svg',
       nextSlot: open.length ? open[0].start : null,
       slotsLeft: open.length,
     };

@@ -3,14 +3,28 @@
   "framework": null,
   "cleanUrls": true,
   "outputDirectory": "public",
-  "rewrites": [{ "source": "/api/:path*", "destination": "/api" }],
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
       ]
     }
+  ],
+  "regions": [
+    "hnd1"
   ]
 }

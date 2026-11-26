@@ -22,8 +22,8 @@
       el('span', { class: 'fact' }, `📍 ${stall.area}`),
     ];
     head.replaceChildren(...[
-      el('section', { class: 'stall-hero' },
-        el('div', { class: 'stall-thumb' }, el('img', { src: stall.cover, alt: '', width: 130, height: 130 })),
+      el('section', { class: 'stall-hero', style: `--k:${Kiosk.theme(stall.slug).main}` },
+        Kiosk.tilt(el('div', { class: 'stall-thumb kiosk-hero' }, Kiosk.svg(stall))),
         el('div', {},
           el('div', { class: 'stall-top' }, el('h1', {}, stall.name), stallBadge(stall)),
           el('div', { class: 'th', lang: 'th' }, stall.nameTh),
@@ -168,7 +168,14 @@
     }
     renderBar();
     // After the first paint, stop the entrance animation from replaying on every change.
-    if (firstLoad) setTimeout(() => menuBox.classList.add('no-anim'), 900);
+    if (firstLoad) {
+      setTimeout(() => menuBox.classList.add('no-anim'), 900);
+      const mapBox = document.getElementById('campus-map');
+      const known = CampusMap.SPOTS.some((sp) => sp.stalls.some(([slug]) => slug === stall.slug));
+      document.getElementById('find-it').hidden = false;
+      if (known) CampusMap.mount(mapBox, { highlight: stall.slug, compact: true });
+      else mapBox.replaceChildren(el('p', { class: 'muted' }, 'The building for this stall is not listed in any source we found, so it is not on the map. ', el('a', { href: '/map' }, 'See the campus map')));
+    }
   }
   let lastKey = '';
 

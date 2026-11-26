@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>CanteenFlow · Siam University</title>
   <meta name="description" content="Student demo: pre-order campus food at Siam University and pick it up without queuing.">
-  <meta name="theme-color" content="#0b6e4f">
+  <meta name="theme-color" content="#0e7a57">
   <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,15 +15,23 @@
 <body>
   <main class="wrap">
     <section class="hero">
-      <h1>Order ahead. Skip the canteen queue.</h1>
-      <p>Pick a stall, choose your food and a pickup time. Collect it hot and pay at the stall.</p>
-      <ol class="hero-steps">
-        <li>1 · Find a stall</li>
-        <li>2 · Choose food</li>
-        <li>3 · Pick a time</li>
-        <li>4 · Collect &amp; pay</li>
-      </ol>
-      <div class="hero-art" aria-hidden="true"><img src="/img/noodles.svg" alt="" width="210" height="158"></div>
+      <div class="hero-copy">
+        <p class="eyebrow">Siam University · Bangkok</p>
+        <h1>Order ahead.<br><span class="hl">Skip the canteen queue.</span></h1>
+        <p>Pick a stall, choose your food and a pickup time. Collect it hot and pay at the stall.</p>
+        <ol class="hero-steps">
+          <li><b>1</b> Find a stall</li>
+          <li><b>2</b> Choose food</li>
+          <li><b>3</b> Pick a time</li>
+          <li><b>4</b> Collect &amp; pay</li>
+        </ol>
+        <div class="hero-cta">
+          <a class="btn btn-accent" href="#stall-list">Browse stalls</a>
+          <a class="btn btn-ghost-light" href="/map">See the 3D campus map</a>
+        </div>
+      </div>
+      <div class="hero-street" id="hero-street" aria-hidden="true"></div>
+      <span class="blob b1" aria-hidden="true"></span><span class="blob b2" aria-hidden="true"></span>
     </section>
 
     <div id="closed-notice"></div>
@@ -47,17 +55,24 @@
       <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
     </div>
 
-    <section aria-labelledby="areas-title">
-      <h2 id="areas-title">Where to find food on campus</h2>
-      <p class="lead">From the official Siam University building list (38 Phetkasem Road, Phasi Charoen). The labels say how sure we are of each place.</p>
-      <div class="areas" id="areas"></div>
-      <p><a href="https://www.google.com/maps/search/?api=1&amp;query=Siam+University+Bangkok" target="_blank" rel="noopener">Open Siam University in Google Maps ↗</a></p>
+    <section class="map-section reveal" aria-labelledby="map-title">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Real campus · OpenStreetMap</p>
+          <h2 id="map-title">Where are the stalls?</h2>
+          <p class="lead">Siam University in 3D. Tap a pin to see which stalls are there and whether they are open.</p>
+        </div>
+        <a class="btn btn-ghost" href="/map">Full-screen map →</a>
+      </div>
+      <div id="campus-map"></div>
     </section>
   </main>
 
   <script src="/js/cart.js"></script>
   <script src="/js/schedule.js"></script>
   <script src="/js/common.js"></script>
+  <script src="/js/kiosk.js"></script>
+  <script src="/js/campus-map.js"></script>
   <script src="/js/home.js"></script>
 </body>
 </html>

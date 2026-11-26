@@ -1,6 +1,6 @@
-// Home page (US-01): stall list, search, pickup-time filter, campus area list.
+// Home page (US-01): stall list, search, pickup-time filter, 3D campus map.
 (function () {
-  const { api, el, labelChip, stallBadge, clock } = CF;
+  const { api, el, stallBadge, clock } = CF;
   const q = document.getElementById('q');
   const pickup = document.getElementById('pickup');
   const list = document.getElementById('stall-list');
@@ -16,8 +16,8 @@
     let when = s.stateText;
     if (s.acceptsOrders && s.nextSlot) when += ` · next pickup ${s.nextSlot}`;
     else if (s.state === 'open' || s.state === 'opens_later') when += ' · no pickup slots left today';
-    return el('a', { class: `stall-card${s.acceptsOrders ? '' : ' is-closed'}`, href: `/stall?id=${s.id}`, style: `animation-delay:${i * 45}ms` },
-      el('div', { class: 'stall-thumb' }, el('img', { src: s.cover, alt: '', width: 84, height: 84, loading: 'lazy' })),
+    return Kiosk.tilt(el('a', { class: `stall-card${s.acceptsOrders ? '' : ' is-closed'}`, href: `/stall?id=${s.id}`, style: `animation-delay:${i * 45}ms` },
+      el('div', { class: 'stall-thumb kiosk-thumb', style: `--k:${Kiosk.theme(s.slug).main}` }, Kiosk.svg(s)),
       el('div', { class: 'stall-body' },
         el('div', { class: 'stall-top' },
           el('div', {}, el('div', { class: 'stall-name' }, s.name), el('div', { class: 'th', lang: 'th' }, s.nameTh)),
@@ -25,7 +25,19 @@
         el('div', { class: 'meta' }, el('b', {}, s.cuisine), el('span', {}, `⏱ ~${s.prepMinutes} min`)),
         el('div', { class: 'meta' }, el('span', {}, `📍 ${s.area}`)),
         el('div', { class: `state-line ${stateClass}` }, when),
-        s.matchedDishes && s.matchedDishes.length ? el('div', { class: 'matches' }, 'Has: ' + s.matchedDishes.join(', ')) : null));
+        s.matchedDishes && s.matchedDishes.length ? el('div', { class: 'matches' }, 'Has: ' + s.matchedDishes.join(', ')) : null)), 5);
+  }
+
+  /** Hero: a little street of 3D shops, lit when open. */
+  const street = document.getElementById('hero-street');
+  function renderStreet(stalls) {
+    if (!street || q.value || pickup.value) return;
+    const pick = ['main-cafeteria-japanese', 'thai-pavilion-noodles', 'hello-tea-coffee']
+      .map((slug) => stalls.find((s) => s.slug === slug)).filter(Boolean);
+    const key = pick.map((s) => s.slug + s.state).join('|');
+    if (street.dataset.key === key) return;
+    street.dataset.key = key;
+    street.replaceChildren(...pick.map((s, i) => el('div', { class: `street-shop s${i}` }, Kiosk.svg(s))));
   }
 
   /** When nothing can be ordered right now (night, weekend), offer the demo clock. */
@@ -67,6 +79,7 @@
     }
     const stalls = data.stalls;
     showClosedNotice(stalls);
+    renderStreet(stalls);
     if (stalls.length === 0) {
       // No-results message (US-01)
       const what = [q.value.trim() && `“${q.value.trim()}”`, pickup.value && `pickup at ${pickup.value}`].filter(Boolean).join(' with ');
@@ -92,37 +105,12 @@
     pickup.value = data.times.includes(keep) ? keep : '';
   }
 
-  async function loadAreas() {
-    const box = document.getElementById('areas');
-    const { ok, data } = await api('/api/places');
-    if (!ok) return;
-    const groups = new Map();
-    for (const p of data.places) {
-      const key = p.area + '|' + (p.building || '');
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(p);
-    }
-    box.replaceChildren();
-    for (const [key, places] of groups) {
-      const [area, building] = key.split('|');
-      box.append(el('div', { class: 'area' },
-        el('h3', {}, building ? el('span', { class: 'bldg' }, building.replace('Building ', 'Bldg ')) : null, area),
-        el('ul', {}, places.map((p) => el('li', {},
-          p.stallId ? el('a', { href: `/stall?id=${p.stallId}` }, p.name) : el('span', {}, p.name),
-          p.stallId
-            ? stallBadge({ state: p.state })
-            : el('span', { class: 'label-chip' }, 'info only'),
-          labelChip(p.label),
-          p.note ? el('span', { class: 'note' }, p.note) : null)))));
-    }
-  }
-
   let timer;
   q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(load, 200); });
   pickup.addEventListener('change', load);
 
   loadTimes().then(load);
-  loadAreas();
+  CampusMap.mount(document.getElementById('campus-map'));
   // Time moves on: refresh open/closed and slots every minute.
-  setInterval(() => { loadTimes().then(load); loadAreas(); }, 60000);
+  setInterval(() => { loadTimes().then(load); }, 60000);
 })();

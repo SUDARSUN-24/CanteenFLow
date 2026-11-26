@@ -124,18 +124,36 @@
   const ICON_CLOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
   const ICON_BAG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
 
+  const ICON_MAP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 4v13.5M15 6.5V20" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+
+  /** Fade sections in as they scroll into view (skipped for reduced motion). */
+  function reveal() {
+    const nodes = document.querySelectorAll('.reveal:not(.is-in)');
+    if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      nodes.forEach((n) => n.classList.add('is-in'));
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { e.target.classList.add('is-in'); io.unobserve(e.target); }
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    nodes.forEach((n) => io.observe(n));
+  }
+
   function renderChrome() {
     const header = el('header', { class: 'site-header' },
       el('div', { class: 'wrap header-row' },
         el('a', { class: 'logo', href: '/' },
-          el('img', { class: 'logo-mark', src: '/img/favicon.svg', alt: '', width: 34, height: 34 }),
-          el('span', {}, 'CanteenFlow', el('small', {}, 'Siam University'))),
+          el('img', { class: 'logo-mark', src: '/img/favicon.svg', alt: '', width: 38, height: 38 }),
+          el('span', { class: 'wordmark' }, 'Canteen', el('span', { class: 'flow' }, 'Flow'), el('small', {}, 'Siam University · pre-order'))),
         el('div', { class: 'header-actions' },
+          el('a', { class: `header-map${location.pathname.startsWith('/map') ? ' is-here' : ''}`, href: '/map', 'aria-label': 'Campus map' },
+            el('span', { class: 'icon map-icon' }), el('span', { class: 'label' }, 'Map')),
           el('button', { class: 'clock-chip', type: 'button', id: 'clock-chip', 'aria-haspopup': 'dialog' }),
           el('a', { class: 'header-order', href: '/order', 'data-order-link': '' },
             el('span', { class: 'icon' }), el('span', { class: 'label' }, 'Order'), el('span', { class: 'count', 'data-order-count': '' }, '0')))),
       el('div', { class: 'wrap' }, el('a', { class: 'active-order', id: 'active-order', href: '#', hidden: true })));
-    header.querySelector('.icon').innerHTML = ICON_BAG;
+    header.querySelector('.header-order .icon').innerHTML = ICON_BAG;
+    header.querySelector('.map-icon').innerHTML = ICON_MAP;
 
     const demoBar = el('div', { class: 'demo-bar' },
       el('span', {}, 'Student course project demo · team Dagabaaz Re · no order is sent to a real shop'));
@@ -147,13 +165,20 @@
         el('p', {}, el('strong', {}, 'CanteenFlow'), ' · Sprint 1 demo for the Agile course · team Dagabaaz Re.'),
         el('p', {}, 'Stall names and buildings come from public sources. Prices, prep times, pickup slots and Sold Out states are demo data. ',
           el('a', { href: 'https://github.com/SUDARSUN-24/CanteenFLow/blob/main/data/SOURCES.md', target: '_blank', rel: 'noopener' }, 'Data sources'),
-          ' · ', el('a', { href: '/orders' }, 'My orders'))));
+          ' · ', el('a', { href: '/map' }, 'Campus map'),
+          ' · ', el('a', { href: '/orders' }, 'My orders')),
+        el('p', { class: 'small' }, 'Map data © ', el('a', { href: 'https://www.openstreetmap.org/copyright', target: '_blank', rel: 'noopener' }, 'OpenStreetMap contributors'), '.')));
     document.body.append(footer);
 
     document.getElementById('clock-chip').addEventListener('click', openClockDialog);
     updateHeader();
     tickHeader();
     setInterval(tickHeader, 1000);
+    reveal();
+    // Sections added later (e.g. after loading) are picked up too.
+    let pending = 0;
+    new MutationObserver(() => { if (!pending) pending = setTimeout(() => { pending = 0; reveal(); }, 250); })
+      .observe(document.querySelector('main') || document.body, { childList: true });
   }
 
   function updateHeader() {

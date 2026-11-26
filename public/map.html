@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Campus food map · CanteenFlow</title>
+  <meta name="description" content="3D map of Siam University with every food stall, live open or closed.">
+  <meta name="theme-color" content="#0e7a57">
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <section class="page-head reveal">
+      <p class="eyebrow">Siam University · 38 Phet Kasem Road, Phasi Charoen</p>
+      <h1>Campus food map</h1>
+      <p class="lead">The real campus in 3D, built from OpenStreetMap. Pins show where each stall is and whether it is taking orders right now.</p>
+      <ul class="legend" aria-label="Pin colours">
+        <li><span class="dot open"></span>Open now</li>
+        <li><span class="dot later"></span>Pre-order</li>
+        <li><span class="dot closed"></span>Closed</li>
+        <li><span class="dot info"></span>Info only</li>
+        <li><span class="dot approx"></span>Approximate spot</li>
+      </ul>
+    </section>
+    <div id="campus-map" class="map-full"></div>
+  </main>
+
+  <script src="/js/cart.js"></script>
+  <script src="/js/schedule.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/kiosk.js"></script>
+  <script src="/js/campus-map.js"></script>
+  <script>CampusMap.mount(document.getElementById('campus-map'));</script>
+</body>
+</html>

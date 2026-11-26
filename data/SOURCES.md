@@ -35,6 +35,21 @@ data (`src/seed.js`) is tagged with one of three labels:
 | True Coffee Siam University | 235 Phetkasem Rd. (no building given) | Coffee, bakery. Mon-Sat about 07:00-15:00 (listing is inconsistent). Reviews mention "ชาซีลอนพรีเมี่ยมโบราณ แก้วใหญ่ 100 บาท". | unverified | https://www.wongnai.com/restaurants/147388tT-true-coffee-%E0%B8%A1%E0%B8%AB%E0%B8%B2%E0%B8%A7%E0%B8%B4%E0%B8%97%E0%B8%A2%E0%B8%B2%E0%B8%A5%E0%B8%B1%E0%B8%A2%E0%B8%AA%E0%B8%A2%E0%B8%B2%E0%B8%A1, https://www.tripadvisor.com/Restaurant_Review-g293916-d10383761-Reviews-True_Coffee_Siam_University-Bangkok.html |
 | KFC Siam University | Building 4 (student-support page) | Fast food, daily 09:30-22:00 (Wongnai). | location verified on one official page. Hours unverified. | https://inter.siam.edu/international-student-support/, https://www.wongnai.com/restaurants/1082837vm-kfc-%E0%B8%A1%E0%B8%AB%E0%B8%B2%E0%B8%A7%E0%B8%B4%E0%B8%97%E0%B8%A2%E0%B8%B2%E0%B8%A5%E0%B8%B1%E0%B8%A2%E0%B8%AA%E0%B8%A2%E0%B8%B2%E0%B8%A1 |
 
+## Campus map (OpenStreetMap)
+
+The 3D map uses OpenStreetMap data downloaded on 2026-11-27 from api.openstreetmap.org
+(campus outline: way 177938414, https://www.openstreetmap.org/way/177938414). © OpenStreetMap
+contributors, ODbL. Stored in `public/data/campus-map.json`.
+
+| Fact | Label | Note |
+|---|---|---|
+| Building outlines, numbers and Thai names (อาคาร 1–22), roads, Khlong Bang Chak, MRT Blue Line | verified (OSM) | Community map data; matches the official building list above. |
+| Building 19 has 19 floors | verified | Its OSM name says "19 ชั้น" (19 floors). |
+| Other building heights | demo data | OSM has no floor counts for them; heights are estimates for the 3D view. |
+| OSM names Building 16 "โภชนาคาร" (dining hall) | unverified | The official student-support page puts the Main Cafeteria in Building 15, so the demo pins Building 15 and says so on the map. |
+| Siam Cafe pin near the main entrance | unverified | Only "inside the university, first turn on the right" is published. The pin is approximate and drawn dashed. |
+| Trees on the map | demo data | Decoration only. |
+
 ## How the research became seed data
 
 - **Orderable stalls (7):** Siam Cafe, Krua Sai Jai Cafe, Main Cafeteria Japanese counter,

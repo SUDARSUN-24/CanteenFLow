@@ -1,44 +1,58 @@
 // API and order rules against a fresh in-memory database. Run: npm test
+// The clock is fixed so results never depend on when the tests run:
+// Tuesday 24 November 2026, 10:00 Bangkok time.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { openDb } = require('../src/db');
 const { createApp } = require('../src/app');
 
-/** Start the app on a random port with a fresh seeded DB. */
+const TUESDAY_10AM = Date.UTC(2026, 10, 24, 3, 0); // 10:00 in Bangkok (UTC+7)
+const MIN = 60 * 1000;
+
+/** Start the app on a random port with a fresh seeded DB and a movable clock. */
 async function start() {
   const db = openDb(':memory:');
-  const server = createApp(db).listen(0);
+  const clock = { ms: TUESDAY_10AM };
+  const server = createApp(db, { now: () => clock.ms }).listen(0);
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const get = async (p) => {
-    const res = await fetch(base + p);
+  const call = async (method, p, data, headers = {}) => {
+    const res = await fetch(base + p, {
+      method, headers: { 'Content-Type': 'application/json', ...headers }, body: data ? JSON.stringify(data) : undefined,
+    });
     return { status: res.status, body: await res.json() };
   };
-  const post = async (p, data) => {
-    const res = await fetch(base + p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-    return { status: res.status, body: await res.json() };
+  return {
+    db, clock,
+    get: (p, headers) => call('GET', p, null, headers),
+    post: (p, data, headers) => call('POST', p, data, headers),
+    /** Move the fixed clock to Tuesday at HH:MM. */
+    at(hhmm) { const [h, m] = hhmm.split(':').map(Number); clock.ms = TUESDAY_10AM + ((h - 10) * 60 + m) * MIN; },
+    orderCount: () => db.prepare('SELECT COUNT(*) AS n FROM orders').get().n,
+    id: (table, col, where, ...args) => db.prepare(`SELECT ${col} AS v FROM ${table} WHERE ${where}`).get(...args).v,
+    close: () => server.close(),
   };
-  const orderCount = () => db.prepare('SELECT COUNT(*) AS n FROM orders').get().n;
-  const id = (table, col, where, ...args) => db.prepare(`SELECT ${col} AS v FROM ${table} WHERE ${where}`).get(...args).v;
-  return { db, get, post, orderCount, id, close: () => server.close() };
 }
 
 let ctx;
 test.beforeEach(async () => { ctx = await start(); });
 test.afterEach(() => ctx.close());
 
-/** A valid order body for Siam Cafe, which tests then break one rule at a time. */
+const stallId = (slug) => ctx.id('stalls', 'stall_id', 'slug = ?', slug);
+const itemId = (name) => ctx.id('menu_items', 'menu_item_id', 'name = ?', name);
+const slotId = (slug, time) => ctx.id('pickup_slots', 'pickup_slot_id', 'stall_id = ? AND start_time = ?', stallId(slug), time);
+
+/** A valid Siam Cafe order for 11:30; each test breaks one rule. */
 function validOrder(over = {}) {
-  const stallId = ctx.id('stalls', 'stall_id', 'slug = ?', 'siam-cafe');
   return {
     submissionToken: crypto.randomUUID(),
-    stallId,
+    stallId: stallId('siam-cafe'),
     items: [
-      { menuItemId: ctx.id('menu_items', 'menu_item_id', 'stall_id = ? AND name = ?', stallId, 'Stir-fried basil pork on rice'), quantity: 2 },
-      { menuItemId: ctx.id('menu_items', 'menu_item_id', 'stall_id = ? AND name = ?', stallId, 'Thai iced tea'), quantity: 1 },
+      { menuItemId: itemId('Stir-fried basil pork on rice'), quantity: 2 },
+      { menuItemId: itemId('Thai iced tea'), quantity: 1 },
     ],
-    pickupSlotId: ctx.id('pickup_slots', 'pickup_slot_id', 'stall_id = ? AND start_time = ?', stallId, '11:30'),
+    pickupSlotId: slotId('siam-cafe', '11:30'),
     customer: { name: 'Somchai', studentId: '6605142003', phone: '081-234-5678' },
     ...over,
   };
@@ -46,17 +60,17 @@ function validOrder(over = {}) {
 
 // ---- US-01 Find a suitable campus stall ----
 
-test('stall list shows every stall with cuisine, open/closed status and prep time', async () => {
+test('stall list shows cuisine, open/closed status and prep time for every stall', async () => {
   const { status, body } = await ctx.get('/api/stalls');
   assert.equal(status, 200);
   assert.ok(body.stalls.length >= 6);
-  const closed = body.stalls.filter((s) => !s.isOpen);
-  assert.equal(closed.length, 1);
-  assert.equal(closed[0].name, 'Sky Lounge Restaurant');
+  const closed = body.stalls.filter((s) => !s.acceptsOrders);
+  assert.deepEqual(closed.map((s) => s.slug), ['sky-lounge']);
+  assert.equal(closed[0].state, 'closed_today');
   for (const s of body.stalls) {
-    assert.ok(s.cuisine);
-    assert.ok(s.prepMinutes > 0);
+    assert.ok(s.cuisine && s.stateText && s.prepMinutes > 0);
   }
+  assert.equal(body.stalls.at(-1).slug, 'sky-lounge', 'closed stalls are listed last');
 });
 
 test('search finds stalls by stall name and by dish name (English or Thai)', async () => {
@@ -71,36 +85,55 @@ test('search finds stalls by stall name and by dish name (English or Thai)', asy
   assert.deepEqual(thai.body.stalls.map((s) => s.slug), ['thai-pavilion-noodles']);
 });
 
-test('search with no match returns an empty list (UI shows a no-results message)', async () => {
+test('search with no match returns an empty list (the page shows a no-results message)', async () => {
   const { status, body } = await ctx.get('/api/stalls?q=pizza');
   assert.equal(status, 200);
   assert.deepEqual(body.stalls, []);
 });
 
-test('pickup-time filter hides closed stalls and stalls whose slot is unavailable', async () => {
+test('pickup-time filter keeps only stalls with an available slot at that time', async () => {
   const { body } = await ctx.get('/api/stalls?pickup=12:00');
   const slugs = body.stalls.map((s) => s.slug);
   assert.ok(!slugs.includes('sky-lounge'), 'closed stall is hidden');
-  assert.ok(!slugs.includes('siam-cafe'), 'Siam Cafe 12:00 slot is unavailable');
-  assert.ok(!slugs.includes('main-cafeteria-japanese'), 'Japanese 12:00 slot is unavailable');
+  assert.ok(!slugs.includes('siam-cafe'), 'Siam Cafe paused its 12:00 slot');
+  assert.ok(!slugs.includes('main-cafeteria-japanese'), 'Japanese counter paused its 12:00 slot');
   assert.ok(slugs.includes('krua-sai-jai'));
   assert.equal((await ctx.get('/api/stalls?pickup=noon')).status, 400);
+});
+
+test('opening hours follow the Bangkok clock (before opening, open, after closing, Sunday)', async () => {
+  const state = async () => Object.fromEntries((await ctx.get('/api/stalls')).body.stalls.map((s) => [s.slug, s.state]));
+  ctx.at('07:30');
+  assert.equal((await state())['siam-cafe'], 'opens_later');
+  ctx.at('10:00');
+  assert.equal((await state())['siam-cafe'], 'open');
+  ctx.at('16:30');
+  assert.equal((await state())['siam-cafe'], 'closed_now');
+  ctx.clock.ms = TUESDAY_10AM + 5 * 24 * 60 * MIN; // Sunday
+  assert.ok(Object.values(await state()).every((s) => s === 'closed_day' || s === 'closed_today'));
 });
 
 // ---- US-02 Choose available food ----
 
 test('menu shows price, image and availability, with Sold Out items marked', async () => {
   const { body } = await ctx.get('/api/stalls/siam-cafe');
-  const omelette = body.menu.find((m) => m.name === 'Thai omelette on rice');
-  assert.equal(omelette.isAvailable, false);
+  assert.equal(body.menu.find((m) => m.name === 'Thai omelette on rice').isAvailable, false);
   for (const m of body.menu) {
     assert.ok(Number.isInteger(m.price) && m.price > 0);
     assert.match(m.image, /^\/img\/.+\.svg$/);
   }
-  const all = (await ctx.get('/api/stalls')).body.stalls;
-  let soldOut = 0;
-  for (const s of all) soldOut += (await ctx.get(`/api/stalls/${s.id}`)).body.menu.filter((m) => !m.isAvailable).length;
+  const soldOut = ctx.db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE is_available = 0').get().n;
   assert.ok(soldOut >= 2, 'at least two Sold Out items are seeded');
+});
+
+test('menu page lists only pickup windows that have not started', async () => {
+  ctx.at('11:20');
+  const { body } = await ctx.get('/api/stalls/siam-cafe');
+  assert.ok(body.slots.every((s) => s.start > '11:20'));
+  const first = body.slots[0];
+  assert.equal(first.start, '11:30');
+  assert.equal(first.isAvailable, true, '11:30 is 10 min away = exactly the prep time');
+  assert.equal(body.slots.find((s) => s.start === '12:00').reason, 'Paused');
 });
 
 // ---- US-05 Place an order for a pickup time ----
@@ -131,7 +164,7 @@ test('an empty order is rejected and creates no order', async () => {
 
 test('a Sold Out item is rejected and creates no order', async () => {
   const order = validOrder();
-  order.items.push({ menuItemId: ctx.id('menu_items', 'menu_item_id', 'name = ?', 'Thai omelette on rice'), quantity: 1 });
+  order.items.push({ menuItemId: itemId('Thai omelette on rice'), quantity: 1 });
   const { status, body } = await ctx.post('/api/orders', order);
   assert.equal(status, 409);
   assert.match(body.error, /Sold Out/);
@@ -140,26 +173,47 @@ test('a Sold Out item is rejected and creates no order', async () => {
 
 test('one order is for one stall only', async () => {
   const order = validOrder();
-  order.items.push({ menuItemId: ctx.id('menu_items', 'menu_item_id', 'name = ?', 'Bibimbap'), quantity: 1 });
+  order.items.push({ menuItemId: itemId('Bibimbap'), quantity: 1 });
   const { status, body } = await ctx.post('/api/orders', order);
   assert.equal(status, 409);
   assert.match(body.error, /one stall/);
   assert.equal(ctx.orderCount(), 0);
 });
 
-test('an unavailable pickup slot is rejected and creates no order', async () => {
-  const stallId = ctx.id('stalls', 'stall_id', 'slug = ?', 'siam-cafe');
-  const slot = ctx.id('pickup_slots', 'pickup_slot_id', 'stall_id = ? AND is_available = 0', stallId);
-  const { status, body } = await ctx.post('/api/orders', validOrder({ pickupSlotId: slot }));
+test('a paused (unavailable) pickup slot is rejected and creates no order', async () => {
+  const { status, body } = await ctx.post('/api/orders', validOrder({ pickupSlotId: slotId('siam-cafe', '12:00') }));
   assert.equal(status, 409);
   assert.ok(body.fields.pickupSlotId);
   assert.equal(ctx.orderCount(), 0);
 });
 
+test('a slot that has passed, or is too soon to cook, is unavailable', async () => {
+  ctx.at('11:25');
+  const past = await ctx.post('/api/orders', validOrder({ pickupSlotId: slotId('siam-cafe', '11:15') }));
+  assert.equal(past.status, 409);
+  assert.match(past.body.error, /past/);
+  const tooSoon = await ctx.post('/api/orders', validOrder({ pickupSlotId: slotId('siam-cafe', '11:30') }));
+  assert.equal(tooSoon.status, 409);
+  assert.match(tooSoon.body.error, /too soon/);
+  assert.equal(ctx.orderCount(), 0);
+});
+
+test('a slot becomes unavailable when it is full', async () => {
+  const slot = slotId('main-cafeteria-japanese', '11:00'); // capacity 3
+  const order = () => validOrder({
+    stallId: stallId('main-cafeteria-japanese'),
+    items: [{ menuItemId: itemId('Chicken teriyaki rice bowl'), quantity: 1 }],
+    pickupSlotId: slot,
+  });
+  for (let i = 0; i < 3; i++) assert.equal((await ctx.post('/api/orders', order())).status, 201);
+  const fourth = await ctx.post('/api/orders', order());
+  assert.equal(fourth.status, 409);
+  assert.match(fourth.body.error, /full/);
+  assert.equal(ctx.orderCount(), 3);
+});
+
 test('a slot from another stall is rejected', async () => {
-  const other = ctx.id('pickup_slots', 'pickup_slot_id', 'stall_id = ? AND is_available = 1',
-    ctx.id('stalls', 'stall_id', 'slug = ?', 'krua-sai-jai'));
-  const { status } = await ctx.post('/api/orders', validOrder({ pickupSlotId: other }));
+  const { status } = await ctx.post('/api/orders', validOrder({ pickupSlotId: slotId('krua-sai-jai', '11:30') }));
   assert.equal(status, 409);
   assert.equal(ctx.orderCount(), 0);
 });
@@ -178,6 +232,7 @@ test('invalid student ID, phone or quantity are rejected', async () => {
   const bad = [
     validOrder({ customer: { name: 'A', studentId: '66-05', phone: '0812345678' } }),
     validOrder({ customer: { name: 'A', studentId: '6605142003', phone: 'call me' } }),
+    validOrder({ customer: { name: 'A', studentId: '6605142003', phone: '-------' } }),
     validOrder({ items: [{ menuItemId: 1, quantity: 0 }] }),
     validOrder({ items: [{ menuItemId: 1, quantity: 21 }] }),
     validOrder({ items: [{ menuItemId: 1, quantity: 1.5 }] }),
@@ -189,32 +244,52 @@ test('invalid student ID, phone or quantity are rejected', async () => {
 test('pressing Place Order twice (same token) creates only one order', async () => {
   const order = validOrder();
   const [first, second] = await Promise.all([ctx.post('/api/orders', order), ctx.post('/api/orders', order)]);
-  const statuses = [first.status, second.status].sort();
-  assert.deepEqual(statuses, [200, 201]);
+  assert.deepEqual([first.status, second.status].sort(), [200, 201]);
   assert.equal(first.body.order.orderNumber, second.body.order.orderNumber);
   assert.equal(ctx.orderCount(), 1);
-  const dup = [first, second].find((r) => r.status === 200);
-  assert.equal(dup.body.duplicate, true);
+  assert.equal([first, second].find((r) => r.status === 200).body.duplicate, true);
 });
 
-test('a closed stall cannot take orders', async () => {
-  const stallId = ctx.id('stalls', 'stall_id', 'slug = ?', 'sky-lounge');
-  const { status, body } = await ctx.post('/api/orders', validOrder({
-    stallId,
-    items: [{ menuItemId: ctx.id('menu_items', 'menu_item_id', 'stall_id = ? AND is_available = 1', stallId), quantity: 1 }],
-    pickupSlotId: ctx.id('pickup_slots', 'pickup_slot_id', 'stall_id = ? AND is_available = 1', stallId),
+test('closed stalls cannot take orders (vendor closed today, or after hours)', async () => {
+  const sky = stallId('sky-lounge');
+  const closedToday = await ctx.post('/api/orders', validOrder({
+    stallId: sky,
+    items: [{ menuItemId: itemId('Caesar salad'), quantity: 1 }],
+    pickupSlotId: slotId('sky-lounge', '12:00'),
   }));
-  assert.equal(status, 409);
-  assert.match(body.error, /closed/);
+  assert.equal(closedToday.status, 409);
+  assert.match(closedToday.body.error, /closed/);
+
+  ctx.at('16:30');
+  const afterHours = await ctx.post('/api/orders', validOrder({ pickupSlotId: slotId('siam-cafe', '15:45') }));
+  assert.equal(afterHours.status, 409);
   assert.equal(ctx.orderCount(), 0);
 });
 
-test('a placed order can be looked up by its number', async () => {
-  const { body } = await ctx.post('/api/orders', validOrder());
+test('students can pre-order before a stall opens', async () => {
+  ctx.at('07:30');
+  const { status, body } = await ctx.post('/api/orders', validOrder({ pickupSlotId: slotId('siam-cafe', '09:00') }));
+  assert.equal(status, 201);
+  assert.equal(body.order.status, 'RECEIVED');
+});
+
+test('order status follows the timer: Received, then Preparing, then Ready', async () => {
+  const { body } = await ctx.post('/api/orders', validOrder()); // 11:30 pickup, 10 min prep
   const n = body.order.orderNumber;
-  const found = await ctx.get(`/api/orders/${n}`);
-  assert.equal(found.status, 200);
-  assert.equal(found.body.order.stall.name, 'Siam Cafe');
-  assert.equal(found.body.order.items.length, 2);
+  const status = async () => (await ctx.get(`/api/orders/${n}`)).body.order.status;
+  assert.equal(await status(), 'RECEIVED');
+  ctx.at('11:21');
+  assert.equal(await status(), 'PREPARING');
+  ctx.at('11:30');
+  assert.equal(await status(), 'READY');
   assert.equal((await ctx.get('/api/orders/CF-NOPE00')).status, 404);
+});
+
+test('the demo clock header moves the server clock (bounded)', async () => {
+  const sunday = await ctx.get('/api/clock', { 'X-Clock-Offset': String(5 * 24 * 60 * MIN) });
+  assert.equal(sunday.body.clock.weekday, 0);
+  const huge = await ctx.get('/api/clock', { 'X-Clock-Offset': String(365 * 24 * 60 * MIN) });
+  assert.equal(huge.body.clock.label, 'Wed 10:00', 'offset is capped at 8 days');
+  const junk = await ctx.get('/api/clock', { 'X-Clock-Offset': 'abc' });
+  assert.equal(junk.body.clock.label, 'Tue 10:00');
 });

@@ -3,9 +3,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const Cart = require('../public/js/cart');
 
-const stallA = { id: 1, name: 'Siam Cafe', isOpen: true };
-const stallB = { id: 2, name: 'Krua Sai Jai Cafe', isOpen: true };
-const closed = { id: 6, name: 'Sky Lounge', isOpen: false };
+const stallA = { id: 1, name: 'Siam Cafe', acceptsOrders: true };
+const stallB = { id: 2, name: 'Krua Sai Jai Cafe', acceptsOrders: true };
+const closed = { id: 6, name: 'Sky Lounge', acceptsOrders: false };
 const rice = { id: 10, name: 'Basil pork rice', price: 50, isAvailable: true };
 const tea = { id: 11, name: 'Thai iced tea', price: 30, isAvailable: true };
 const soldOut = { id: 12, name: 'Omelette rice', price: 35, isAvailable: false };

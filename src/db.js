@@ -11,10 +11,10 @@ CREATE TABLE IF NOT EXISTS stalls (
   name_th       TEXT,
   area          TEXT NOT NULL,
   cuisine       TEXT NOT NULL,
-  hours_text    TEXT NOT NULL,
+  hours_json    TEXT NOT NULL,           -- {"1":["08:00","16:00"], ...} weekday 0 = Sunday
   hours_label   TEXT NOT NULL,           -- verified | unverified | demo data
   prep_minutes  INTEGER NOT NULL CHECK (prep_minutes > 0),
-  is_open       INTEGER NOT NULL DEFAULT 1,
+  is_open_today INTEGER NOT NULL DEFAULT 1, -- vendor switch: 0 = closed all day
   closed_note   TEXT,
   description   TEXT,
   data_label    TEXT NOT NULL            -- how much of this stall is real
@@ -35,9 +35,10 @@ CREATE TABLE IF NOT EXISTS menu_items (
 CREATE TABLE IF NOT EXISTS pickup_slots (
   pickup_slot_id INTEGER PRIMARY KEY,
   stall_id       INTEGER NOT NULL REFERENCES stalls(stall_id),
-  start_time     TEXT NOT NULL,          -- 'HH:MM', today
+  start_time     TEXT NOT NULL,          -- 'HH:MM', 15-minute window
   end_time       TEXT NOT NULL,
-  is_available   INTEGER NOT NULL DEFAULT 1,
+  capacity       INTEGER NOT NULL CHECK (capacity BETWEEN 1 AND 500), -- orders per window per day
+  is_blocked     INTEGER NOT NULL DEFAULT 0, -- vendor paused this window
   UNIQUE (stall_id, start_time)
 );
 
@@ -47,6 +48,9 @@ CREATE TABLE IF NOT EXISTS orders (
   submission_token TEXT NOT NULL UNIQUE,  -- duplicate-submit guard
   stall_id         INTEGER NOT NULL REFERENCES stalls(stall_id),
   pickup_slot_id   INTEGER NOT NULL REFERENCES pickup_slots(pickup_slot_id),
+  order_date       TEXT NOT NULL,          -- Bangkok date the order is for (YYYY-MM-DD)
+  placed_minutes   REAL NOT NULL,          -- Bangkok minutes after midnight when placed
+  prep_minutes     INTEGER NOT NULL,       -- stall prep time when placed
   customer_name    TEXT NOT NULL,
   student_id       TEXT NOT NULL,
   phone            TEXT NOT NULL,
@@ -55,6 +59,8 @@ CREATE TABLE IF NOT EXISTS orders (
   total_amount     INTEGER NOT NULL CHECK (total_amount > 0),
   created_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
+-- Counting orders per pickup window per day (slot capacity).
+CREATE INDEX IF NOT EXISTS idx_orders_slot_day ON orders(pickup_slot_id, order_date);
 
 CREATE TABLE IF NOT EXISTS order_items (
   order_item_id INTEGER PRIMARY KEY,
@@ -77,16 +83,21 @@ CREATE TABLE IF NOT EXISTS campus_places (
 );
 `;
 
+// Bump when the schema changes; an older database file is rebuilt from the seed.
+const SCHEMA_VERSION = 2;
+
 /** Open (or create) the database at `file`. ':memory:' is used by the tests. */
 function openDb(file = ':memory:', { reset = false } = {}) {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA foreign_keys = ON;');
-  if (reset) {
+  const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (reset || version !== SCHEMA_VERSION) {
     db.exec(`DROP TABLE IF EXISTS order_items; DROP TABLE IF EXISTS orders;
              DROP TABLE IF EXISTS pickup_slots; DROP TABLE IF EXISTS menu_items;
              DROP TABLE IF EXISTS campus_places; DROP TABLE IF EXISTS stalls;`);
   }
   db.exec(SCHEMA);
+  db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   const { n } = db.prepare('SELECT COUNT(*) AS n FROM stalls').get();
   if (n === 0) seed(db);
   return db;

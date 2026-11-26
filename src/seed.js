@@ -1,9 +1,10 @@
 // Seed data for the demo. See data/SOURCES.md for where each fact came from.
 // Labels: "verified" (official Siam University page), "unverified" (third-party
 // listing, may be out of date), "demo data" (invented for the demo).
-// ALL prices, prep times, pickup slots and Sold Out states are demo data.
+// ALL prices, prep times, slot capacities, paused slots and Sold Out states are demo data.
+// Pickup slots are 15-minute windows inside each stall's opening hours.
 
-const LUNCH_SLOTS = ['10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30'];
+const { toMin, toHHMM, SLOT_MINUTES } = require('../public/js/schedule');
 
 const STALLS = [
   {
@@ -12,12 +13,12 @@ const STALLS = [
     name_th: 'สยามคาเฟ่',
     area: 'Inside the university, first turn on the right',
     cuisine: 'Thai made-to-order',
-    hours_text: 'Mon–Fri 08:00–16:00 · Sat 09:00–16:00',
+    hours: { 1: ['08:00', '16:00'], 2: ['08:00', '16:00'], 3: ['08:00', '16:00'], 4: ['08:00', '16:00'], 5: ['08:00', '16:00'], 6: ['09:00', '16:00'] },
     hours_label: 'unverified',
     prep_minutes: 10,
     description: 'Made-to-order Thai rice and noodle dishes (อาหารตามสั่ง).',
     data_label: 'Real place (unverified listing). Menu prices are demo data.',
-    slots: { times: LUNCH_SLOTS, unavailable: ['12:00'] },
+    slots: { capacity: 4, blocked: ['12:00', '12:15'] },
     menu: [
       ['Stir-fried basil pork on rice', 'ข้าวกะเพราหมู', 'Rice dishes', 50, 'rice', 1],
       ['Pork fried rice', 'ข้าวผัดหมู', 'Rice dishes', 50, 'rice', 1],
@@ -34,12 +35,12 @@ const STALLS = [
     name_th: 'ครัวใส่ใจคาเฟ่ สาขา 4',
     area: 'Siam University campus (building not listed)',
     cuisine: 'Thai one-plate meals',
-    hours_text: 'Mon–Fri 10:00–15:00',
+    hours: { 1: ['10:00', '15:00'], 2: ['10:00', '15:00'], 3: ['10:00', '15:00'], 4: ['10:00', '15:00'], 5: ['10:00', '15:00'] },
     hours_label: 'demo data',
     prep_minutes: 15,
     description: 'One-plate meals (อาหารจานเดียว).',
     data_label: 'Real place (unverified listing). Hours and prices are demo data.',
-    slots: { times: LUNCH_SLOTS, unavailable: [] },
+    slots: { capacity: 4, blocked: [] },
     menu: [
       ['Stir-fried noodles with water mimosa and shrimp', 'หมี่ผัดกระเฉดกุ้ง', 'Noodles', 120, 'noodles', 1],
       ['Gravy noodles with pork', 'ราดหน้าหมู', 'Noodles', 90, 'noodles', 1],
@@ -55,12 +56,12 @@ const STALLS = [
     name_th: 'โรงอาหารหลัก – อาหารญี่ปุ่น',
     area: 'Main Cafeteria, Building 15',
     cuisine: 'Japanese',
-    hours_text: 'Mon–Fri 10:00–15:00',
+    hours: { 1: ['10:00', '15:00'], 2: ['10:00', '15:00'], 3: ['10:00', '15:00'], 4: ['10:00', '15:00'], 5: ['10:00', '15:00'] },
     hours_label: 'demo data',
     prep_minutes: 12,
     description: 'Rice bowls and sides.',
     data_label: 'The Main Cafeteria serves Japanese food (verified). This counter, its hours and prices are demo data.',
-    slots: { times: LUNCH_SLOTS, unavailable: ['12:00', '12:30'] },
+    slots: { capacity: 3, blocked: ['12:00'] },
     menu: [
       ['Chicken teriyaki rice bowl', 'ข้าวหน้าไก่เทอริยากิ', 'Rice bowls', 65, 'bento', 1],
       ['Pork katsu curry rice', 'ข้าวแกงกะหรี่หมูทอด', 'Rice bowls', 75, 'bowl', 0], // Sold Out
@@ -76,12 +77,12 @@ const STALLS = [
     name_th: 'โรงอาหารหลัก – อาหารเกาหลี',
     area: 'Main Cafeteria, Building 15',
     cuisine: 'Korean',
-    hours_text: 'Mon–Fri 10:00–15:00',
+    hours: { 1: ['10:00', '15:00'], 2: ['10:00', '15:00'], 3: ['10:00', '15:00'], 4: ['10:00', '15:00'], 5: ['10:00', '15:00'] },
     hours_label: 'demo data',
     prep_minutes: 12,
     description: 'Bibimbap, kimbap and street snacks.',
     data_label: 'The Main Cafeteria serves Korean food (verified). This counter, its hours and prices are demo data.',
-    slots: { times: LUNCH_SLOTS, unavailable: ['12:30'] },
+    slots: { capacity: 3, blocked: ['12:30'] },
     menu: [
       ['Bibimbap', 'บิบิมบับ', 'Rice dishes', 70, 'bowl', 1],
       ['Kimchi fried rice', 'ข้าวผัดกิมจิ', 'Rice dishes', 60, 'rice', 1],
@@ -97,12 +98,12 @@ const STALLS = [
     name_th: 'ศาลาไทย – ร้านก๋วยเตี๋ยว',
     area: 'Thai Pavilion, Building 4',
     cuisine: 'Thai noodles',
-    hours_text: 'Mon–Fri 09:00–15:00',
+    hours: { 1: ['09:00', '15:00'], 2: ['09:00', '15:00'], 3: ['09:00', '15:00'], 4: ['09:00', '15:00'], 5: ['09:00', '15:00'], 6: ['09:00', '15:00'] },
     hours_label: 'demo data',
     prep_minutes: 6,
     description: 'Quick noodle soups and snacks.',
     data_label: 'The Thai Pavilion has a cafeteria (verified). This counter, its hours and prices are demo data.',
-    slots: { times: LUNCH_SLOTS, unavailable: [] },
+    slots: { capacity: 4, blocked: [] },
     menu: [
       ['Boat noodles', 'ก๋วยเตี๋ยวเรือ', 'Noodle soups', 45, 'noodles', 1],
       ['Tom yum noodles', 'ก๋วยเตี๋ยวต้มยำ', 'Noodle soups', 50, 'noodles', 1],
@@ -118,14 +119,14 @@ const STALLS = [
     name_th: 'สกายเลานจ์',
     area: 'Building 19 (Golden Jubilee), 9th floor',
     cuisine: 'Thai and international set lunches',
-    hours_text: 'Mon–Fri 11:00–15:00',
+    hours: { 1: ['11:00', '15:00'], 2: ['11:00', '15:00'], 3: ['11:00', '15:00'], 4: ['11:00', '15:00'], 5: ['11:00', '15:00'] },
     hours_label: 'unverified',
     prep_minutes: 20,
-    is_open: 0, // the demo's closed stall
+    is_open_today: 0, // the demo's closed stall (vendor switched it off)
     closed_note: 'Closed today (demo data).',
     description: 'Set lunches with a view from the 9th floor.',
     data_label: 'Location verified. Hours unverified. Menu, prices and "closed today" are demo data.',
-    slots: { times: ['11:30', '12:00', '12:30', '13:00', '13:30', '14:00'], unavailable: [] },
+    slots: { capacity: 4, blocked: [] },
     menu: [
       ['Chicken massaman curry with rice', 'ข้าวแกงมัสมั่นไก่', 'Set lunch', 120, 'bowl', 1],
       ['Spaghetti carbonara', 'สปาเกตตีคาโบนารา', 'Set lunch', 130, 'noodles', 1],
@@ -140,12 +141,12 @@ const STALLS = [
     name_th: 'ฮัลโหล ที แอนด์ คอฟฟี่',
     area: 'Building 19 (Golden Jubilee), 8th floor',
     cuisine: 'Bubble tea and coffee',
-    hours_text: 'Mon–Fri 08:00–17:00',
+    hours: { 1: ['08:00', '17:00'], 2: ['08:00', '17:00'], 3: ['08:00', '17:00'], 4: ['08:00', '17:00'], 5: ['08:00', '17:00'] },
     hours_label: 'demo data',
     prep_minutes: 5,
     description: 'Bubble tea, coffee and soda.',
     data_label: 'Real place (unverified, 2018 listing). Hours and prices are demo data.',
-    slots: { times: ['08:30', '09:00', '09:30', '10:00', ...LUNCH_SLOTS, '15:00', '15:30', '16:00'], unavailable: ['12:00'] },
+    slots: { capacity: 6, blocked: ['12:00'] },
     menu: [
       ['Bubble milk tea', 'ชานมไข่มุก', 'Tea', 45, 'bubbletea', 1],
       ['Thai tea with pearls', 'ชาไทยไข่มุก', 'Tea', 45, 'bubbletea', 1],
@@ -174,21 +175,24 @@ const PLACES = [
   ['Building not listed', null, 'True Coffee', null, 'Listed at Siam University. Not in this demo.', 'unverified'],
 ];
 
-/** Add 15 minutes to an 'HH:MM' time. */
-function plus15(time) {
-  const [h, m] = time.split(':').map(Number);
-  const t = h * 60 + m + 15;
-  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+/** Every 15-minute pickup window between a stall's earliest opening and latest closing. */
+function slotTimes(hours) {
+  const ranges = Object.values(hours);
+  const first = Math.min(...ranges.map((r) => toMin(r[0])));
+  const last = Math.max(...ranges.map((r) => toMin(r[1])));
+  const times = [];
+  for (let t = first; t + SLOT_MINUTES <= last; t += SLOT_MINUTES) times.push(toHHMM(t));
+  return times;
 }
 
 function seed(db) {
   const insStall = db.prepare(`INSERT INTO stalls
-    (slug, name, name_th, area, cuisine, hours_text, hours_label, prep_minutes, is_open, closed_note, description, data_label)
+    (slug, name, name_th, area, cuisine, hours_json, hours_label, prep_minutes, is_open_today, closed_note, description, data_label)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const insItem = db.prepare(`INSERT INTO menu_items
     (stall_id, name, name_th, category, price, image, is_available) VALUES (?, ?, ?, ?, ?, ?, ?)`);
   const insSlot = db.prepare(`INSERT INTO pickup_slots
-    (stall_id, start_time, end_time, is_available) VALUES (?, ?, ?, ?)`);
+    (stall_id, start_time, end_time, capacity, is_blocked) VALUES (?, ?, ?, ?, ?)`);
   const insPlace = db.prepare(`INSERT INTO campus_places
     (area, building, name, stall_id, note, label) VALUES (?, ?, ?, ?, ?, ?)`);
 
@@ -196,15 +200,15 @@ function seed(db) {
   const idBySlug = {};
   for (const s of STALLS) {
     const { lastInsertRowid } = insStall.run(
-      s.slug, s.name, s.name_th, s.area, s.cuisine, s.hours_text, s.hours_label,
-      s.prep_minutes, s.is_open ?? 1, s.closed_note ?? null, s.description, s.data_label);
+      s.slug, s.name, s.name_th, s.area, s.cuisine, JSON.stringify(s.hours), s.hours_label,
+      s.prep_minutes, s.is_open_today ?? 1, s.closed_note ?? null, s.description, s.data_label);
     const id = Number(lastInsertRowid);
     idBySlug[s.slug] = id;
     for (const [name, th, cat, price, img, avail] of s.menu) {
       insItem.run(id, name, th, cat, price, `/img/${img}.svg`, avail);
     }
-    for (const t of s.slots.times) {
-      insSlot.run(id, t, plus15(t), s.slots.unavailable.includes(t) ? 0 : 1);
+    for (const t of slotTimes(s.hours)) {
+      insSlot.run(id, t, toHHMM(toMin(t) + SLOT_MINUTES), s.slots.capacity, s.slots.blocked.includes(t) ? 1 : 0);
     }
   }
   for (const [area, building, name, slug, note, label] of PLACES) {

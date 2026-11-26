@@ -19,7 +19,7 @@
    */
   function addItem(cart, stall, item) {
     if (!item.isAvailable) return { ok: false, reason: 'sold_out', cart };
-    if (!stall.isOpen) return { ok: false, reason: 'closed', cart };
+    if (!stall.acceptsOrders) return { ok: false, reason: 'closed', cart };
     if (cart.stallId !== null && cart.stallId !== stall.id && cart.items.length > 0) {
       return { ok: false, reason: 'other_stall', cart };
     }

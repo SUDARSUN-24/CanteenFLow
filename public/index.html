@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>CanteenFlow · Siam University</title>
+  <meta name="description" content="Student demo: pre-order campus food at Siam University and pick it up without queuing.">
+  <meta name="theme-color" content="#0b6e4f">
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>Order ahead. Skip the canteen queue.</h1>
+      <p>Pick a stall, choose your food and a pickup time. Collect it hot and pay at the stall.</p>
+      <ol class="hero-steps">
+        <li>1 · Find a stall</li>
+        <li>2 · Choose food</li>
+        <li>3 · Pick a time</li>
+        <li>4 · Collect &amp; pay</li>
+      </ol>
+      <div class="hero-art" aria-hidden="true"><img src="/img/noodles.svg" alt="" width="210" height="158"></div>
+    </section>
+
+    <div id="closed-notice"></div>
+
+    <form class="search-panel" id="search-form" role="search" onsubmit="return false">
+      <div class="field">
+        <label for="q">Search stall or dish</label>
+        <div class="search-input">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="q" name="q" type="search" placeholder="Try: noodles, bibimbap, ชาไทย" autocomplete="off" enterkeyhint="search">
+        </div>
+      </div>
+      <div class="field">
+        <label for="pickup">Pickup time today</label>
+        <select id="pickup" name="pickup"><option value="">Any time</option></select>
+      </div>
+    </form>
+
+    <p class="result-count" id="result-count" aria-live="polite"></p>
+    <div class="stall-list" id="stall-list" aria-busy="true">
+      <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+    </div>
+
+    <section aria-labelledby="areas-title">
+      <h2 id="areas-title">Where to find food on campus</h2>
+      <p class="lead">From the official Siam University building list (38 Phetkasem Road, Phasi Charoen). The labels say how sure we are of each place.</p>
+      <div class="areas" id="areas"></div>
+      <p><a href="https://www.google.com/maps/search/?api=1&amp;query=Siam+University+Bangkok" target="_blank" rel="noopener">Open Siam University in Google Maps ↗</a></p>
+    </section>
+  </main>
+
+  <script src="/js/cart.js"></script>
+  <script src="/js/schedule.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/home.js"></script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Your order · CanteenFlow</title>
+  <meta name="theme-color" content="#0b6e4f">
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <a class="back" id="back" href="/">← Back to menu</a>
+    <h1>Your order</h1>
+    <ol class="steps" aria-label="Progress">
+      <li class="current">Check order</li>
+      <li id="step-time">Pickup time</li>
+      <li id="step-details">Your details</li>
+    </ol>
+
+    <div id="alert" tabindex="-1"></div>
+
+    <div class="order-layout">
+      <section class="panel" aria-labelledby="sum-title">
+        <h2 id="sum-title"><span class="num">1</span> Check your order</h2>
+        <p class="sub" id="sum-stall"></p>
+        <div id="lines"></div>
+        <div class="total-row" id="total-row"><span>Total</span><span id="total">฿0</span></div>
+        <p class="pay-note"><span aria-hidden="true">💵</span><span>Pay at the stall when you collect. There is no online payment.</span></p>
+      </section>
+
+      <div class="sticky">
+        <form id="checkout" novalidate>
+          <section class="panel" aria-labelledby="time-title">
+            <h2 id="time-title"><span class="num">2</span> Pickup time</h2>
+            <p class="sub" id="time-sub">Today, 15-minute windows.</p>
+            <fieldset class="slots" id="slots" aria-describedby="slot-error"><legend class="sr-only">Pickup time</legend></fieldset>
+            <div class="field"><div class="error" id="slot-error" role="alert"></div></div>
+            <div class="slot-legend"><span>Striped = unavailable (past, too soon to cook, full or paused)</span></div>
+          </section>
+
+          <section class="panel" aria-labelledby="details-title">
+            <h2 id="details-title"><span class="num">3</span> Your details</h2>
+            <p class="sub">So the stall knows whose order it is.</p>
+            <div class="form-grid">
+              <div class="field" id="f-name">
+                <label for="name">Name</label>
+                <input id="name" name="name" autocomplete="name" maxlength="100" required>
+                <div class="error" id="name-error"></div>
+              </div>
+              <div class="field" id="f-studentId">
+                <label for="studentId">Student ID</label>
+                <input id="studentId" name="studentId" inputmode="numeric" autocomplete="off" maxlength="20" required placeholder="e.g. 6605142003">
+                <div class="error" id="studentId-error"></div>
+              </div>
+              <div class="field" id="f-phone">
+                <label for="phone">Phone</label>
+                <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" required placeholder="e.g. 081-234-5678">
+                <div class="error" id="phone-error"></div>
+              </div>
+              <div class="field">
+                <label for="note">Note for the stall (optional)</label>
+                <textarea id="note" name="note" maxlength="200" placeholder="e.g. not spicy, no coriander"></textarea>
+              </div>
+              <label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="remember" checked> Remember my details on this device</label>
+            </div>
+          </section>
+
+          <div class="place-bar">
+            <button class="btn btn-block" type="submit" id="place">Place order</button>
+            <p class="why" id="why"></p>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/cart.js"></script>
+  <script src="/js/schedule.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/order.js"></script>
+</body>
+</html>

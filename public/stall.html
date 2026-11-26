@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Menu · CanteenFlow</title>
+  <meta name="theme-color" content="#0b6e4f">
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <a class="back" href="/">← All stalls</a>
+    <div id="stall-head"><div class="skeleton" style="height:150px"></div></div>
+    <div class="chips" id="categories" role="group" aria-label="Filter by category"></div>
+    <div class="menu-grid" id="menu" aria-live="polite"></div>
+  </main>
+
+  <!-- Floating order bar: item count + total -->
+  <div class="order-bar" id="order-bar" hidden>
+    <a href="/order">
+      <span class="left"><span class="qty-badge" id="bar-count">0</span><span><span id="bar-total">฿0</span><span class="sub" id="bar-stall"></span></span></span>
+      <span class="go">View order →</span>
+    </a>
+  </div>
+
+  <!-- One order = one stall -->
+  <dialog id="other-stall" aria-labelledby="other-title">
+    <h2 id="other-title">Start a new order?</h2>
+    <p id="other-text"></p>
+    <div class="dialog-actions">
+      <button class="btn" type="button" id="other-new">Start new order here</button>
+      <button class="btn btn-ghost" type="button" id="other-keep">Keep my current order</button>
+    </div>
+  </dialog>
+
+  <script src="/js/cart.js"></script>
+  <script src="/js/schedule.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/stall.js"></script>
+</body>
+</html>

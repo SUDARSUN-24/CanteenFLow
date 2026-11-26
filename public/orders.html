@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>My orders · CanteenFlow</title>
+  <meta name="theme-color" content="#0b6e4f">
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <a class="back" href="/">← All stalls</a>
+    <h1>My orders</h1>
+    <p class="lead">Orders placed on this device. Tap one to see its live status.</p>
+    <div class="orders-list" id="list"></div>
+
+    <h2>Find an order by number</h2>
+    <form class="search-panel" id="find" style="grid-template-columns:1fr auto;align-items:end">
+      <div class="field">
+        <label for="num">Order number</label>
+        <input id="num" placeholder="CF-7K3QXM" autocapitalize="characters" autocomplete="off" required>
+      </div>
+      <button class="btn" type="submit">Find</button>
+    </form>
+  </main>
+  <script src="/js/cart.js"></script>
+  <script src="/js/schedule.js"></script>
+  <script src="/js/common.js"></script>
+  <script>
+    // My orders: list from this device, with live status from the shared timer rules.
+    (function () {
+      const { el, myOrders, clock, STATUS_TEXT } = CF;
+      const list = document.getElementById('list');
+      function render() {
+        const orders = myOrders.all();
+        if (!orders.length) {
+          list.replaceChildren(el('div', { class: 'empty-state' }, el('p', {}, 'No orders on this device yet.'), el('a', { class: 'btn', href: '/' }, 'Browse stalls')));
+          return;
+        }
+        const c = clock.read();
+        list.replaceChildren(...orders.map((o, i) => {
+          const st = Schedule.orderStatus(o, c);
+          const text = st.status === 'READY' ? 'Ready for pickup' : `${STATUS_TEXT[st.status]} · ready in ${Schedule.formatCountdown(st.secondsToReady)}`;
+          return el('a', { class: 'order-row', href: `/confirm?n=${encodeURIComponent(o.orderNumber)}`, style: `animation-delay:${i * 40}ms` },
+            el('div', {}, el('strong', {}, o.orderNumber), el('div', { class: 'muted', style: 'font-size:14px' }, `${o.stall.name} · ${o.date} · pickup ${o.pickupStart}`)),
+            el('div', { style: 'text-align:right' }, el('div', { style: 'font-weight:800' }, Cart.baht(o.total)),
+              el('span', { class: `badge ${st.status === 'READY' ? 'badge-later' : 'badge-open'}` }, st.expired ? 'Past' : text)));
+        }));
+      }
+      document.getElementById('find').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const n = document.getElementById('num').value.trim().toUpperCase();
+        if (n) location.href = `/confirm?n=${encodeURIComponent(n)}`;
+      });
+      render();
+      setInterval(render, 1000);
+    })();
+  </script>
+</body>
+</html>

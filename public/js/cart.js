@@ -27,7 +27,7 @@
     if (existing && existing.qty >= MAX_QTY) return { ok: false, reason: 'max_qty', cart };
     const items = existing
       ? cart.items.map((i) => (i.id === item.id ? { ...i, qty: i.qty + 1 } : i))
-      : [...cart.items, { id: item.id, name: item.name, price: item.price, qty: 1 }];
+      : [...cart.items, { id: item.id, name: item.name, price: item.price, qty: 1, ...(item.image ? { image: item.image } : {}) }];
     return { ok: true, cart: { stallId: stall.id, stallName: stall.name, items } };
   }
 

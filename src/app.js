@@ -3,28 +3,44 @@
 const path = require('node:path');
 const express = require('express');
 const Schedule = require('../public/js/schedule');
-const { allStalls, getStall, slotUsage, slotsFor } = require('./data');
+const { getStall, slotsFor, loadAll } = require('./data');
 const { placeOrder, getOrder, OrderError } = require('./orders');
 
 const TIME_RE = /^\d{2}:\d{2}$/;
 
+/** Wrap an async route so errors become JSON responses instead of crashes. */
+const route = (fn) => async (req, res) => {
+  try {
+    await fn(req, res);
+  } catch (err) {
+    if (err instanceof OrderError) return res.status(err.status).json({ error: err.message, fields: err.fields });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong on the server. Nothing was saved. Please try again.' });
+  }
+};
+
 /**
- * @param db      node:sqlite database
+ * @param dbOrPromise  database from openDb() (or a promise of one, so Vercel can start connecting early)
  * @param options.now  function returning the real time in ms (tests pass a fixed time)
  */
-function createApp(db, { now = () => Date.now() } = {}) {
+function createApp(dbOrPromise, { now = () => Date.now() } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '20kb' }));
+
+  let db = null;
+  const ready = Promise.resolve(dbOrPromise).then((d) => { db = d; });
+  ready.catch((err) => console.error('Database failed to open:', err));
+  app.use('/api', (req, res, next) => {
+    ready.then(() => next(), () => res.status(503).json({ error: 'The database is not available right now. Please try again in a minute.' }));
+  });
 
   // Bangkok clock for this request. The browser may send X-Clock-Offset (ms)
   // when the student switches on the demo clock, e.g. to try lunchtime at night.
   const clockFor = (req) => Schedule.clockAt(now() + Schedule.safeOffset(req.get('X-Clock-Offset')));
 
-  const coverStmt = db.prepare('SELECT image FROM menu_items WHERE stall_id = ? ORDER BY menu_item_id LIMIT 1');
-
   /** Stall + live state, as shown on the list and menu pages. */
-  function present(stall, clock, slots) {
+  function present(stall, clock, slots, cover) {
     const st = Schedule.stallState(stall, clock);
     const open = slots.filter((s) => s.isAvailable);
     return {
@@ -34,107 +50,109 @@ function createApp(db, { now = () => Date.now() } = {}) {
       state: st.state, stateText: st.text, isOpenNow: st.isOpenNow,
       // Can a student order right now? Open now, or opening later today (pre-order), with a slot left.
       acceptsOrders: (st.state === 'open' || st.state === 'opens_later') && open.length > 0,
-      cover: coverStmt.get(stall.id)?.image ?? '/img/rice.svg',
+      cover: cover || '/img/rice.svg',
       nextSlot: open.length ? open[0].start : null,
       slotsLeft: open.length,
     };
   }
 
+  /** Menu rows for all stalls (for search and cover pictures). */
+  const allMenuRows = () => db.all('SELECT stall_id, name, name_th, image FROM menu_items ORDER BY menu_item_id');
+  const coverOf = (rows, stallId) => (rows.find((r) => Number(r.stall_id) === stallId) || {}).image;
+
   app.get('/api/clock', (req, res) => res.json({ clock: clockFor(req) }));
 
   // US-01: stall list with search (stall or dish name) and pickup-time filter.
-  app.get('/api/stalls', (req, res) => {
+  app.get('/api/stalls', route(async (req, res) => {
     const clock = clockFor(req);
     const q = String(req.query.q ?? '').trim().toLowerCase();
     const pickup = String(req.query.pickup ?? '').trim();
     if (pickup && !TIME_RE.test(pickup)) return res.status(400).json({ error: 'Pickup time must look like 12:30.' });
 
-    const usage = slotUsage(db, clock.date);
-    const items = db.prepare('SELECT stall_id, name, name_th FROM menu_items').all();
+    const [all, items] = await Promise.all([loadAll(db, clock), allMenuRows()]);
     const result = [];
-    for (const stall of allStalls(db)) {
+    for (const { stall, slots } of all) {
       let matchedDishes = [];
       if (q) {
         const stallHit = [stall.name, stall.nameTh].some((t) => t && t.toLowerCase().includes(q));
         matchedDishes = items
-          .filter((i) => i.stall_id === stall.id && [i.name, i.name_th].some((t) => t && t.toLowerCase().includes(q)))
+          .filter((i) => Number(i.stall_id) === stall.id && [i.name, i.name_th].some((t) => t && t.toLowerCase().includes(q)))
           .map((i) => i.name);
         if (!stallHit && matchedDishes.length === 0) continue;
       }
-      const slots = slotsFor(db, stall, clock, usage);
       // Pickup filter: only stalls with an available window starting at that time.
       if (pickup && !slots.some((s) => s.start === pickup && s.isAvailable)) continue;
-      result.push({ ...present(stall, clock, slots), matchedDishes });
+      result.push({ ...present(stall, clock, slots, coverOf(items, stall.id)), matchedDishes });
     }
     // Orderable stalls first, then the rest; keep seed order inside each group.
     result.sort((a, b) => Number(b.acceptsOrders) - Number(a.acceptsOrders));
     res.json({ clock, stalls: result });
-  });
+  }));
 
   // Pickup times that at least one stall can still take today (for the filter).
-  app.get('/api/pickup-times', (req, res) => {
+  app.get('/api/pickup-times', route(async (req, res) => {
     const clock = clockFor(req);
-    const usage = slotUsage(db, clock.date);
     const times = new Set();
-    for (const stall of allStalls(db)) {
-      for (const s of slotsFor(db, stall, clock, usage)) if (s.isAvailable) times.add(s.start);
+    for (const { slots } of await loadAll(db, clock)) {
+      for (const s of slots) if (s.isAvailable) times.add(s.start);
     }
     res.json({ clock, times: [...times].sort() });
-  });
+  }));
 
   // US-02: one stall with its menu and today's remaining pickup windows.
-  app.get('/api/stalls/:id', (req, res) => {
+  app.get('/api/stalls/:id', route(async (req, res) => {
     const clock = clockFor(req);
-    const stall = getStall(db, req.params.id);
+    const stall = await getStall(db, req.params.id);
     if (!stall) return res.status(404).json({ error: 'Stall not found.' });
-    const slots = slotsFor(db, stall, clock);
-    const menu = db.prepare('SELECT * FROM menu_items WHERE stall_id = ? ORDER BY menu_item_id').all(stall.id);
+    const [slots, menu] = await Promise.all([
+      slotsFor(db, stall, clock),
+      db.all('SELECT * FROM menu_items WHERE stall_id = ? ORDER BY menu_item_id', [stall.id]),
+    ]);
     res.json({
       clock,
-      stall: present(stall, clock, slots),
+      stall: present(stall, clock, slots, menu[0] && menu[0].image),
       menu: menu.map((m) => ({
-        id: m.menu_item_id, name: m.name, nameTh: m.name_th, category: m.category,
-        price: m.price, image: m.image, isAvailable: Boolean(m.is_available),
+        id: Number(m.menu_item_id), name: m.name, nameTh: m.name_th, category: m.category,
+        price: Number(m.price), image: m.image, isAvailable: Boolean(m.is_available),
       })),
       // Hide windows outside today's hours and ones that have already started.
       slots: slots.filter((s) => s.reason !== 'Closed' && s.reason !== 'Past'),
     });
-  });
+  }));
 
   // Campus area list.
-  app.get('/api/places', (req, res) => {
+  app.get('/api/places', route(async (req, res) => {
     const clock = clockFor(req);
-    const usage = slotUsage(db, clock.date);
-    const states = new Map(allStalls(db).map((s) => [s.id, present(s, clock, slotsFor(db, s, clock, usage))]));
-    const rows = db.prepare('SELECT * FROM campus_places ORDER BY place_id').all();
+    const [all, rows] = await Promise.all([loadAll(db, clock), db.all('SELECT * FROM campus_places ORDER BY place_id')]);
+    const states = new Map(all.map(({ stall, slots }) => [stall.id, present(stall, clock, slots)]));
     res.json({
       places: rows.map((r) => {
-        const st = r.stall_id ? states.get(r.stall_id) : null;
+        const st = r.stall_id != null ? states.get(Number(r.stall_id)) : null;
         return {
-          area: r.area, building: r.building, name: r.name, stallId: r.stall_id,
+          area: r.area, building: r.building, name: r.name, stallId: r.stall_id == null ? null : Number(r.stall_id),
           state: st ? st.state : null, isOpenNow: st ? st.isOpenNow : null, note: r.note, label: r.label,
         };
       }),
     });
-  });
+  }));
 
   // US-05: place an order. 201 = created, 200 = duplicate (same token).
-  app.post('/api/orders', (req, res) => {
-    try {
-      const { created, order } = placeOrder(db, req.body, clockFor(req));
-      res.status(created ? 201 : 200).json({ order, duplicate: !created });
-    } catch (err) {
-      if (err instanceof OrderError) return res.status(err.status).json({ error: err.message, fields: err.fields });
-      console.error(err);
-      res.status(500).json({ error: 'Something went wrong. Your order was not placed.' });
-    }
-  });
+  app.post('/api/orders', route(async (req, res) => {
+    const { created, order } = await placeOrder(db, req.body, clockFor(req));
+    res.status(created ? 201 : 200).json({ order, duplicate: !created });
+  }));
 
-  app.get('/api/orders/:number', (req, res) => {
-    const order = getOrder(db, String(req.params.number).toUpperCase(), clockFor(req));
+  app.get('/api/orders/:number', route(async (req, res) => {
+    const order = await getOrder(db, String(req.params.number).toUpperCase(), clockFor(req));
     if (!order) return res.status(404).json({ error: 'Order not found.' });
     res.json({ order });
-  });
+  }));
+
+  // Which database is in use (for checking the live setup; never shows secrets).
+  app.get('/api/health', route(async (req, res) => {
+    const { n } = await db.get('SELECT COUNT(*) AS n FROM orders');
+    res.json({ ok: true, database: db.url.startsWith('libsql:') || db.url.startsWith('https:') ? 'turso' : 'local-file', orders: Number(n) });
+  }));
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found.' }));
 

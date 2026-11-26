@@ -185,36 +185,44 @@ function slotTimes(hours) {
   return times;
 }
 
-function seed(db) {
-  const insStall = db.prepare(`INSERT INTO stalls
-    (slug, name, name_th, area, cuisine, hours_json, hours_label, prep_minutes, is_open_today, closed_note, description, data_label)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-  const insItem = db.prepare(`INSERT INTO menu_items
-    (stall_id, name, name_th, category, price, image, is_available) VALUES (?, ?, ?, ?, ?, ?, ?)`);
-  const insSlot = db.prepare(`INSERT INTO pickup_slots
-    (stall_id, start_time, end_time, capacity, is_blocked) VALUES (?, ?, ?, ?, ?)`);
-  const insPlace = db.prepare(`INSERT INTO campus_places
-    (area, building, name, stall_id, note, label) VALUES (?, ?, ?, ?, ?, ?)`);
-
-  db.exec('BEGIN');
+/**
+ * All seed rows as SQL statements with fixed ids, so they can run in one
+ * atomic batch (locally or on Turso). Stall ids are 1..7 in the order above.
+ */
+function seedStatements() {
+  const out = [];
   const idBySlug = {};
-  for (const s of STALLS) {
-    const { lastInsertRowid } = insStall.run(
-      s.slug, s.name, s.name_th, s.area, s.cuisine, JSON.stringify(s.hours), s.hours_label,
-      s.prep_minutes, s.is_open_today ?? 1, s.closed_note ?? null, s.description, s.data_label);
-    const id = Number(lastInsertRowid);
+  let itemId = 0;
+  let slotId = 0;
+  STALLS.forEach((s, i) => {
+    const id = i + 1;
     idBySlug[s.slug] = id;
+    out.push({
+      sql: `INSERT INTO stalls (stall_id, slug, name, name_th, area, cuisine, hours_json, hours_label,
+            prep_minutes, is_open_today, closed_note, description, data_label) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [id, s.slug, s.name, s.name_th, s.area, s.cuisine, JSON.stringify(s.hours), s.hours_label,
+        s.prep_minutes, s.is_open_today ?? 1, s.closed_note ?? null, s.description, s.data_label],
+    });
     for (const [name, th, cat, price, img, avail] of s.menu) {
-      insItem.run(id, name, th, cat, price, `/img/${img}.svg`, avail);
+      out.push({
+        sql: 'INSERT INTO menu_items (menu_item_id, stall_id, name, name_th, category, price, image, is_available) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        args: [++itemId, id, name, th, cat, price, `/img/${img}.svg`, avail],
+      });
     }
     for (const t of slotTimes(s.hours)) {
-      insSlot.run(id, t, toHHMM(toMin(t) + SLOT_MINUTES), s.slots.capacity, s.slots.blocked.includes(t) ? 1 : 0);
+      out.push({
+        sql: 'INSERT INTO pickup_slots (pickup_slot_id, stall_id, start_time, end_time, capacity, is_blocked) VALUES (?, ?, ?, ?, ?, ?)',
+        args: [++slotId, id, t, toHHMM(toMin(t) + SLOT_MINUTES), s.slots.capacity, s.slots.blocked.includes(t) ? 1 : 0],
+      });
     }
-  }
-  for (const [area, building, name, slug, note, label] of PLACES) {
-    insPlace.run(area, building, name, slug ? idBySlug[slug] : null, note, label);
-  }
-  db.exec('COMMIT');
+  });
+  PLACES.forEach(([area, building, name, slug, note, label], i) => {
+    out.push({
+      sql: 'INSERT INTO campus_places (place_id, area, building, name, stall_id, note, label) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      args: [i + 1, area, building, name, slug ? idBySlug[slug] : null, note, label],
+    });
+  });
+  return out;
 }
 
-module.exports = { seed, STALLS };
+module.exports = { seedStatements, STALLS };

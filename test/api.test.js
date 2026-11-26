@@ -4,6 +4,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { DatabaseSync } = require('node:sqlite');
 const { openDb } = require('../src/db');
 const { createApp } = require('../src/app');
 
@@ -12,9 +16,13 @@ const MIN = 60 * 1000;
 
 /** Start the app on a random port with a fresh seeded DB and a movable clock. */
 async function start() {
-  const db = openDb(':memory:');
+  // A fresh database file per test; the app talks to it through libSQL (as on
+  // the live site) and the test reads it directly with node:sqlite.
+  const file = path.join(TMP_DIR, `${crypto.randomUUID()}.db`);
+  const appDb = await openDb({ url: `file:${file.split(path.sep).join('/')}` });
+  const db = new DatabaseSync(file);
   const clock = { ms: TUESDAY_10AM };
-  const server = createApp(db, { now: () => clock.ms }).listen(0);
+  const server = createApp(appDb, { now: () => clock.ms }).listen(0);
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${server.address().port}`;
   const call = async (method, p, data, headers = {}) => {
@@ -31,9 +39,17 @@ async function start() {
     at(hhmm) { const [h, m] = hhmm.split(':').map(Number); clock.ms = TUESDAY_10AM + ((h - 10) * 60 + m) * MIN; },
     orderCount: () => db.prepare('SELECT COUNT(*) AS n FROM orders').get().n,
     id: (table, col, where, ...args) => db.prepare(`SELECT ${col} AS v FROM ${table} WHERE ${where}`).get(...args).v,
-    close: () => server.close(),
+    close: () => {
+      server.close();
+      db.close();
+      appDb.close();
+      // Windows may still hold the file for a moment; the folder is removed after all tests.
+    },
   };
 }
+
+const TMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'canteenflow-test-'));
+test.after(() => { try { fs.rmSync(TMP_DIR, { recursive: true, force: true }); } catch (e) { /* locked on Windows: OS cleans temp */ } });
 
 let ctx;
 test.beforeEach(async () => { ctx = await start(); });
@@ -292,4 +308,16 @@ test('the demo clock header moves the server clock (bounded)', async () => {
   assert.equal(huge.body.clock.label, 'Wed 10:00', 'offset is capped at 8 days');
   const junk = await ctx.get('/api/clock', { 'X-Clock-Offset': 'abc' });
   assert.equal(junk.body.clock.label, 'Tue 10:00');
+});
+
+test('orders arriving at the same moment never overbook a slot', async () => {
+  const order = () => validOrder({
+    stallId: stallId('main-cafeteria-japanese'),
+    items: [{ menuItemId: itemId('Salmon rice bowl'), quantity: 1 }],
+    pickupSlotId: slotId('main-cafeteria-japanese', '13:00'), // capacity 3
+  });
+  const results = await Promise.all(Array.from({ length: 6 }, () => ctx.post('/api/orders', order())));
+  assert.equal(results.filter((r) => r.status === 201).length, 3);
+  assert.equal(results.filter((r) => r.status === 409).length, 3);
+  assert.equal(ctx.orderCount(), 3);
 });

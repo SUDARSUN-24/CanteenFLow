@@ -1,19 +1,25 @@
 // Local server: `npm start`, then open http://localhost:3000
-// `npm run reset-db` rebuilds data/canteenflow.db from the seed data.
+// Uses data/canteenflow.db unless TURSO_DATABASE_URL is set (then the hosted Turso database).
+// `npm run reset-db` rebuilds the database from the seed data.
 const path = require('node:path');
-const { openDb } = require('./src/db');
+const { openDb, dbConfigFromEnv } = require('./src/db');
 const { createApp } = require('./src/app');
 
-const file = process.env.DB_FILE || path.join(__dirname, 'data', 'canteenflow.db');
+const localFile = process.env.DB_FILE || path.join(__dirname, 'data', 'canteenflow.db');
+const config = dbConfigFromEnv(`file:${localFile.replace(/\\/g, '/')}`);
 const resetOnly = process.argv.includes('--reset-only');
-const db = openDb(file, { reset: resetOnly || process.argv.includes('--reset') });
 
-if (resetOnly) {
-  console.log(`Database reset: ${file}`);
-  process.exit(0);
-}
-
-const port = Number(process.env.PORT) || 3000;
-createApp(db).listen(port, () => {
-  console.log(`CanteenFlow running at http://localhost:${port}`);
+openDb({ ...config, reset: resetOnly || process.argv.includes('--reset') }).then((db) => {
+  if (resetOnly) {
+    console.log(`Database reset: ${config.url.startsWith('file:') ? config.url : 'Turso'}`);
+    db.close();
+    return;
+  }
+  const port = Number(process.env.PORT) || 3000;
+  createApp(db).listen(port, () => {
+    console.log(`CanteenFlow running at http://localhost:${port} (${config.url.startsWith('file:') ? 'local SQLite file' : 'Turso'})`);
+  });
+}).catch((err) => {
+  console.error('Could not open the database:', err.message);
+  process.exit(1);
 });

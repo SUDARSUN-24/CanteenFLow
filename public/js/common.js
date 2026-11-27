@@ -139,6 +139,68 @@
     nodes.forEach((n) => io.observe(n));
   }
 
+  // ---------- living background + scroll effects ----------
+  const DOODLES = {
+    chili: '<svg viewBox="0 0 32 32"><path d="M9 10c-3 6-1 15 6 18 6 2 12-2 10-4-6 1-11-5-11-12" fill="#ef5b3a"/><path d="M12 9c0-3 2-5 5-5" stroke="#0e7a57" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>',
+    leaf: '<svg viewBox="0 0 32 32"><path d="M6 26C6 12 14 5 27 5c0 13-7 21-21 21z" fill="#2fb47e"/><path d="M6 26 20 12" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg>',
+    bowl: '<svg viewBox="0 0 32 32"><path d="M4 15h24c0 7-5.4 12-12 12S4 22 4 15z" fill="#0e7a57"/><rect x="3" y="13" width="26" height="3.4" rx="1.7" fill="#ffb224"/><path d="M11 10c0-2 2-2 2-4M17 10c0-2 2-2 2-4" stroke="#0e7a57" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>',
+    bean: '<svg viewBox="0 0 32 32"><ellipse cx="16" cy="16" rx="8" ry="11" transform="rotate(30 16 16)" fill="#8a5a2b"/><path d="M12 8c6 4 2 12 8 16" stroke="#f3d1a1" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>',
+    star: '<svg viewBox="0 0 32 32"><path d="M16 3l3.2 9.2L29 13l-7.6 6 2.6 9.5L16 23l-8 5.5 2.6-9.5L3 13l9.8-.8z" fill="#ffb224"/></svg>',
+    cup: '<svg viewBox="0 0 32 32"><path d="M8 10h16l-2 17H10z" fill="#c98b4a"/><rect x="7" y="7" width="18" height="4" rx="2" fill="#5b3a1c"/><circle cx="12" cy="23" r="1.6" fill="#3a2414"/><circle cx="17" cy="24" r="1.6" fill="#3a2414"/><circle cx="20" cy="21.5" r="1.6" fill="#3a2414"/><path d="M18 7l3-5" stroke="#ef5b3a" stroke-width="2" stroke-linecap="round"/></svg>',
+    noodle: '<svg viewBox="0 0 32 32"><path d="M5 9c4 0 4 4 8 4s4-4 8-4 4 4 6 4M5 16c4 0 4 4 8 4s4-4 8-4 4 4 6 4" stroke="#e8a317" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>',
+  };
+  // [kind, left %, top (vh), scroll depth, rotation]
+  const DOODLE_SPOTS = [
+    ['chili', 6, 14, .25, -20], ['leaf', 88, 22, .4, 30], ['bowl', 14, 48, .15, 0], ['star', 80, 58, .3, 10],
+    ['bean', 92, 84, .2, -10], ['noodle', 4, 78, .35, 0], ['cup', 70, 8, .12, 8], ['leaf', 30, 92, .28, -40],
+    ['chili', 60, 96, .45, 25], ['star', 46, 34, .5, -5], ['bean', 24, 4, .18, 40], ['bowl', 94, 42, .32, 0],
+    ['noodle', 52, 70, .22, 12], ['cup', 10, 108, .4, -12], ['star', 84, 120, .26, 20], ['leaf', 40, 130, .36, 60],
+  ];
+  const SPARK = '<svg viewBox="0 0 20 20"><path d="M10 0c.6 5.4 4 8.8 10 10-6 1.2-9.4 4.6-10 10-.6-5.4-4-8.8-10-10 6-1.2 9.4-4.6 10-10z" fill="currentColor"/></svg>';
+  const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function renderBackground() {
+    const scene = el('div', { class: 'bg-scene', 'aria-hidden': 'true' });
+    for (let i = 1; i <= 5; i++) scene.append(el('span', { class: `orb o${i}` }));
+    DOODLE_SPOTS.forEach(([kind, x, y, d, r], i) => {
+      const node = el('span', { class: 'doodle', style: `left:${x}%;top:${y}vh;--d:${d};--r:${r}deg;--t:${8 + (i % 5) * 1.7}s;--w:${-i * 1.3}s` });
+      node.innerHTML = DOODLES[kind];
+      scene.append(node);
+    });
+    document.body.prepend(scene);
+    // Sparkles in the home hero
+    const hero = document.querySelector('.hero');
+    if (hero) for (let i = 1; i <= 4; i++) { const s = el('span', { class: `spark k${i}`, 'aria-hidden': 'true' }); s.innerHTML = SPARK; hero.append(s); }
+  }
+
+  /** Feeds the scroll position to CSS (--sy, --p) for parallax and the progress line. */
+  function trackScroll(header) {
+    const root = document.documentElement;
+    const bar = el('span', { class: 'scroll-progress', 'aria-hidden': 'true' });
+    header.append(bar);
+    const setSbw = () => root.style.setProperty('--sbw', `${Math.max(0, innerWidth - root.clientWidth)}px`);
+    setSbw();
+    addEventListener('resize', setSbw);
+    let queued = false;
+    const update = () => {
+      queued = false;
+      const y = scrollY;
+      const max = Math.max(1, root.scrollHeight - innerHeight);
+      if (!reducedMotion()) root.style.setProperty('--sy', y.toFixed(0));
+      bar.style.setProperty('--p', Math.min(1, y / max).toFixed(4));
+      header.classList.toggle('is-scrolled', y > 8);
+    };
+    addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
+    update();
+  }
+
+  /** Gives static blocks a scroll-in style before reveal() watches them. */
+  function tagReveals() {
+    document.querySelectorAll('main .section-head:not(.reveal)').forEach((n) => { if (!n.closest('.reveal')) n.classList.add('reveal', 'from-left'); });
+    document.querySelectorAll('main .panel:not(.reveal)').forEach((n, i) => n.classList.add('reveal', i % 2 ? 'from-right' : 'zoom'));
+    document.querySelectorAll('footer .wrap:not(.reveal)').forEach((n) => n.classList.add('reveal'));
+  }
+
   function renderChrome() {
     const header = el('header', { class: 'site-header' },
       el('div', { class: 'wrap header-row' },
@@ -174,10 +236,13 @@
     updateHeader();
     tickHeader();
     setInterval(tickHeader, 1000);
+    renderBackground();
+    trackScroll(header);
+    tagReveals();
     reveal();
     // Sections added later (e.g. after loading) are picked up too.
     let pending = 0;
-    new MutationObserver(() => { if (!pending) pending = setTimeout(() => { pending = 0; reveal(); }, 250); })
+    new MutationObserver(() => { if (!pending) pending = setTimeout(() => { pending = 0; tagReveals(); reveal(); }, 250); })
       .observe(document.querySelector('main') || document.body, { childList: true });
   }
 

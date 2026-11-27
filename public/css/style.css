@@ -676,3 +676,138 @@ main { animation: page-in .45s var(--ease); }
 @media (max-width: 350px) {
   .logo .wordmark { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
+
+/* =====================================================================
+   Living background, scroll effects and colour (motion pass)
+   ===================================================================== */
+body { background: #fdf6ea; }
+
+/* Colourful background behind every page: drifting colour orbs, a dot grid
+   and floating food doodles. Orbs and doodles move a little as you scroll. */
+.bg-scene { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
+  background: linear-gradient(170deg, #ffefd2 0%, #fde8dc 38%, #eaf6e8 72%, #dcf2e8 100%); }
+.bg-scene::after { content: ""; position: absolute; inset: 0; opacity: .5;
+  background-image: radial-gradient(rgba(14, 122, 87, .16) 1px, transparent 1.6px); background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 0%, #000 30%, transparent 85%);
+  mask-image: radial-gradient(120% 90% at 50% 0%, #000 30%, transparent 85%); }
+.orb { position: absolute; border-radius: 50%; translate: 0 calc(var(--sy, 0) * var(--d, .1) * -1px);
+  animation: orb-drift var(--t, 26s) ease-in-out infinite alternate; will-change: transform; }
+.orb.o1 { --d: .06; --t: 24s; width: 620px; height: 620px; top: -260px; right: -200px; background: radial-gradient(circle, rgba(255, 178, 36, .72), rgba(255, 178, 36, 0) 68%); }
+.orb.o2 { --d: .12; --t: 30s; width: 560px; height: 560px; top: 30vh; left: -260px; background: radial-gradient(circle, rgba(47, 211, 154, .55), rgba(47, 211, 154, 0) 68%); animation-delay: -8s; }
+.orb.o3 { --d: .18; --t: 34s; width: 520px; height: 520px; top: 70vh; right: -220px; background: radial-gradient(circle, rgba(239, 91, 58, .42), rgba(239, 91, 58, 0) 68%); animation-delay: -14s; }
+.orb.o4 { --d: .09; --t: 28s; width: 420px; height: 420px; top: 8vh; left: 32%; background: radial-gradient(circle, rgba(255, 196, 80, .45), rgba(255, 196, 80, 0) 70%); animation-delay: -4s; }
+.orb.o5 { --d: .22; --t: 38s; width: 480px; height: 480px; top: 115vh; left: 20%; background: radial-gradient(circle, rgba(90, 184, 255, .32), rgba(90, 184, 255, 0) 70%); animation-delay: -20s; }
+@keyframes orb-drift { 0% { transform: translate3d(0, 0, 0) scale(1); } 50% { transform: translate3d(40px, -30px, 0) scale(1.12); } 100% { transform: translate3d(-30px, 40px, 0) scale(.94); } }
+.doodle { position: absolute; width: 34px; height: 34px; opacity: .24; translate: 0 calc(var(--sy, 0) * var(--d, .2) * -1px);
+  animation: doodle-float var(--t, 9s) ease-in-out infinite; animation-delay: var(--w, 0s); }
+.doodle svg { width: 100%; height: 100%; display: block; }
+@keyframes doodle-float { 0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); } 50% { transform: translateY(-16px) rotate(calc(var(--r, 0deg) + 14deg)); } }
+@media (max-width: 640px) { .doodle:nth-of-type(n + 10) { display: none; } .doodle { width: 26px; height: 26px; } }
+
+/* Header: glass, a shadow once you scroll, and a scroll progress line */
+.site-header { background: rgba(255, 252, 246, .78); transition: box-shadow .3s, background .3s; }
+.site-header.is-scrolled { background: rgba(255, 252, 246, .92); box-shadow: 0 10px 30px -18px rgba(7, 61, 45, .45); }
+.scroll-progress { position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; transform-origin: 0 50%; transform: scaleX(var(--p, 0));
+  background: linear-gradient(90deg, var(--brand), #2fd39a 35%, var(--accent) 70%, var(--chili)); pointer-events: none; }
+.logo-mark { transition: transform .5s var(--ease); }
+.logo:hover .logo-mark { transform: rotate(-10deg) scale(1.08); }
+
+/* Hero: slow light rays, sparkles, and parallax as you scroll away */
+.hero::after { content: ""; position: absolute; z-index: -1; left: 50%; top: -60%; width: 160%; aspect-ratio: 1; margin-left: -80%;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 255, 255, .07) 0deg 8deg, rgba(255, 255, 255, 0) 8deg 22deg);
+  -webkit-mask-image: radial-gradient(circle, #000 10%, transparent 62%); mask-image: radial-gradient(circle, #000 10%, transparent 62%);
+  animation: rays 60s linear infinite; }
+@keyframes rays { to { transform: rotate(360deg); } }
+.hero-street { translate: 0 calc(min(var(--sy, 0), 600) * .14px); }
+.hero .blob.b1 { translate: 0 calc(min(var(--sy, 0), 600) * .35px); }
+.hero .blob.b2 { translate: 0 calc(min(var(--sy, 0), 600) * -.2px); }
+.hero-copy { translate: 0 calc(min(var(--sy, 0), 600) * -.06px); }
+.spark { position: absolute; z-index: -1; width: 14px; height: 14px; pointer-events: none; color: #ffe39b; animation: twinkle 3.2s ease-in-out infinite; }
+.spark svg { width: 100%; height: 100%; display: block; }
+.spark.k1 { top: 14%; right: 9%; } .spark.k2 { top: 6%; right: 38%; width: 10px; height: 10px; animation-delay: -1.1s; }
+.spark.k3 { top: 22%; left: 52%; width: 9px; height: 9px; animation-delay: -2s; color: #fff; } .spark.k4 { bottom: 34%; right: 6%; width: 11px; height: 11px; animation-delay: -.6s; }
+@keyframes twinkle { 0%, 100% { opacity: .15; transform: scale(.5) rotate(0deg); } 50% { opacity: 1; transform: scale(1.15) rotate(45deg); } }
+.hero h1 .hl { background-size: 200% 100%; animation: hl-shift 6s ease-in-out infinite alternate; }
+@keyframes hl-shift { to { background-position: 100% 0; } }
+
+/* Buttons: a light sweep on hover */
+.btn { position: relative; overflow: hidden; isolation: isolate; }
+.btn::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .45) 50%, transparent 70%); translate: -120% 0; transition: translate .7s var(--ease); }
+.btn:hover::after { translate: 120% 0; }
+.btn:not(.btn-ghost):not(.btn-ghost-light):not([disabled]):hover { box-shadow: var(--shadow-pop); }
+
+/* Search panel: frosted glass over the colourful background */
+.search-panel { background: rgba(255, 255, 255, .82); -webkit-backdrop-filter: blur(12px) saturate(1.3); backdrop-filter: blur(12px) saturate(1.3);
+  border-color: rgba(255, 255, 255, .9); box-shadow: 0 18px 40px -24px rgba(7, 61, 45, .35), 0 1px 0 rgba(255, 255, 255, .9) inset; }
+
+/* Section headings: a colour bar that grows in when the section scrolls into view */
+.section-head h2::after, .page-head h1::after { content: ""; display: block; height: 5px; width: 64px; margin-top: 8px; border-radius: 99px;
+  background: linear-gradient(90deg, var(--brand), var(--accent), var(--chili)); transform-origin: 0 50%; transform: scaleX(0);
+  transition: transform .9s .25s var(--ease); }
+.is-in .section-head h2::after, .section-head.is-in h2::after, .page-head.is-in h1::after { transform: scaleX(1); }
+
+/* Scroll-in variants (JS adds .reveal plus one of these) */
+.reveal.from-left { transform: translateX(-36px); }
+.reveal.from-right { transform: translateY(28px) rotate(1.5deg); transform-origin: 0 100%; }
+.reveal.zoom { transform: scale(.94) translateY(20px); }
+.reveal.is-in.from-left, .reveal.is-in.from-right, .reveal.is-in.zoom { transform: none; }
+
+/* Food ribbons: two crossing bands of dish names that scroll sideways */
+.ribbons { position: relative; height: 128px; margin: 34px 0 6px calc(50% - (100vw - var(--sbw, 0px)) / 2);
+  width: calc(100vw - var(--sbw, 0px)); overflow: hidden; pointer-events: none; }
+.ribbon { position: absolute; left: -5%; width: 110%; top: 34px; padding: 11px 0; display: flex; overflow: hidden; white-space: nowrap; font-weight: 700; font-size: 17px;
+  box-shadow: 0 12px 28px -16px rgba(7, 61, 45, .55); }
+.ribbon.r1 { background: linear-gradient(90deg, var(--accent), #ffcf5c, var(--accent)); color: #3a2400; rotate: -3deg; z-index: 1; }
+.ribbon.r2 { background: linear-gradient(90deg, var(--jade-deep), var(--brand), var(--jade-deep)); color: #e9fff5; rotate: 2.5deg; top: 44px; }
+.ribbon .move { display: flex; flex: none; margin-left: -240px; }
+@supports (animation-timeline: view()) {
+  .ribbon .move { animation: ribbon-x linear both; animation-timeline: view(); }
+  .ribbon.r2 .move { animation-direction: reverse; }
+}
+@keyframes ribbon-x { from { translate: 0 0; } to { translate: -200px 0; } }
+.ribbon .track { display: flex; flex: none; animation: marquee 38s linear infinite; }
+.ribbon.r2 .track { animation-direction: reverse; animation-duration: 46s; }
+.ribbon .track span { padding: 0 18px; }
+.ribbon .track span::after { content: "✦"; margin-left: 36px; opacity: .55; }
+@keyframes marquee { to { transform: translateX(-33.3333%); } }
+
+/* Map section on a coloured glass panel */
+.map-section { position: relative; padding: 4px 16px 18px; margin: 18px -4px 0; border-radius: 28px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, .72), rgba(225, 243, 234, .8)); border: 1px solid rgba(255, 255, 255, .9);
+  box-shadow: 0 24px 50px -32px rgba(7, 61, 45, .5); }
+.map-section .section-head { margin-top: 18px; }
+
+/* Cards and dishes rise in as they scroll into view, where the browser supports
+   scroll-driven animations. Uses translate/scale so hover and tilt still work. */
+.stall-card, .dish { background: rgba(255, 255, 255, .93); }
+.stall-card:hover { border-color: rgba(14, 122, 87, .35); box-shadow: 0 22px 40px -24px rgba(7, 61, 45, .55); }
+@supports (animation-timeline: view()) {
+  .stall-card, .dish { animation: rise-in linear both; animation-timeline: view(); animation-range: entry 0% entry 85%; }
+  .map-section { animation: rise-in linear both; animation-timeline: view(); animation-range: entry 0% entry 60%; }
+  .ribbons { animation: ribbon-in linear both; animation-timeline: view(); animation-range: entry 0% cover 45%; }
+}
+@keyframes rise-in { from { opacity: 0; translate: 0 56px; scale: .94; } to { opacity: 1; translate: 0 0; scale: 1; } }
+@keyframes ribbon-in { from { opacity: 0; scale: 1 .4; } to { opacity: 1; scale: 1; } }
+
+/* Footer: deep jade with a scalloped top edge */
+footer { position: relative; margin-top: 60px; border-top: 0; color: #cfe9de; padding: 34px 0 120px;
+  background: radial-gradient(80% 120% at 90% 0%, rgba(255, 178, 36, .22), transparent 60%), linear-gradient(170deg, #0b5a40, var(--jade-deep)); }
+footer::before { content: ""; position: absolute; left: 0; right: 0; top: -22px; height: 23px; background: #0b5a40;
+  -webkit-mask: radial-gradient(24px 23px at 50% 100%, #000 98%, transparent) 0 0 / 48px 23px repeat-x;
+  mask: radial-gradient(24px 23px at 50% 100%, #000 98%, transparent) 0 0 / 48px 23px repeat-x; }
+footer strong { color: #fff; }
+footer a { color: #ffd57a; }
+footer a:hover { color: #fff; }
+
+/* Bottom bars fade into the warm background */
+.order-bar { background: linear-gradient(to top, rgba(253, 246, 234, .96) 55%, rgba(253, 246, 234, 0)); }
+.place-bar { background: linear-gradient(to top, rgba(253, 246, 234, .97) 70%, rgba(253, 246, 234, 0)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .orb, .doodle, .hero::after, .spark, .ribbon .track, .hero h1 .hl { animation: none !important; }
+  .orb, .doodle, .hero-street, .hero .blob, .hero-copy { translate: none !important; }
+  .ribbon .move { animation: none !important; }
+  .stall-card, .dish, .map-section, .ribbons { animation: none !important; opacity: 1 !important; }
+  .section-head h2::after, .page-head h1::after { transform: scaleX(1); transition: none; }
+}

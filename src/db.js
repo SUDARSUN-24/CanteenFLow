@@ -7,7 +7,7 @@ const { seedStatements } = require('./seed');
 
 // Bump when the schema or seed changes; an older database is rebuilt from the seed.
 // (Rebuilding deletes old demo orders, which is fine for this demo.)
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 const DROP = [
   'DROP TABLE IF EXISTS order_items', 'DROP TABLE IF EXISTS orders', 'DROP TABLE IF EXISTS pickup_slots',
@@ -28,7 +28,8 @@ const SCHEMA = [
     is_open_today INTEGER NOT NULL DEFAULT 1, -- vendor switch: 0 = closed all day
     closed_note   TEXT,
     description   TEXT,
-    data_label    TEXT NOT NULL             -- how much of this stall is real
+    data_label    TEXT NOT NULL,            -- how much of this stall is real
+    vendor_pin    TEXT NOT NULL             -- demo sign-in for the stall's vendor page (not real security)
   )`,
   `CREATE TABLE menu_items (
     menu_item_id  INTEGER PRIMARY KEY,
@@ -46,7 +47,7 @@ const SCHEMA = [
     stall_id       INTEGER NOT NULL REFERENCES stalls(stall_id),
     start_time     TEXT NOT NULL,           -- 'HH:MM', 15-minute window
     end_time       TEXT NOT NULL,
-    capacity       INTEGER NOT NULL CHECK (capacity BETWEEN 1 AND 500), -- orders per window per day
+    capacity       INTEGER CHECK (capacity IS NULL OR capacity BETWEEN 1 AND 500), -- NULL = SLOT_CAPACITY from src/config.js
     is_blocked     INTEGER NOT NULL DEFAULT 0, -- vendor paused this window
     UNIQUE (stall_id, start_time)
   )`,
@@ -63,11 +64,17 @@ const SCHEMA = [
     student_id       TEXT NOT NULL,
     phone            TEXT NOT NULL,
     note             TEXT,
-    status           TEXT NOT NULL DEFAULT 'RECEIVED',
+    status           TEXT NOT NULL DEFAULT 'RECEIVED'
+                     CHECK (status IN ('RECEIVED', 'PREPARING', 'READY', 'COLLECTED', 'CANCELLED', 'NO_SHOW')),
+    cancelled_by     TEXT CHECK (cancelled_by IS NULL OR cancelled_by IN ('student', 'vendor')),
+    status_reason    TEXT,                   -- vendor's reason for a rejection or cancellation
+    status_changed_at TEXT,                  -- Bangkok 'YYYY-MM-DD HH:MM' of the last status change
     total_amount     INTEGER NOT NULL CHECK (total_amount > 0),
     created_at       TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
   'CREATE INDEX idx_orders_slot_day ON orders(pickup_slot_id, order_date)',
+  'CREATE INDEX idx_orders_student ON orders(student_id, status)',
+  'CREATE INDEX idx_orders_stall_day ON orders(stall_id, order_date)',
   `CREATE TABLE order_items (
     order_item_id INTEGER PRIMARY KEY,
     order_id      INTEGER NOT NULL REFERENCES orders(order_id),

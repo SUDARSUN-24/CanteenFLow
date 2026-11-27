@@ -1,5 +1,5 @@
 // Time rules shared by the server and the browser: Bangkok clock, opening
-// hours, pickup-slot availability and the order status timer.
+// hours, pickup-slot availability and the order countdown.
 // Bangkok is UTC+7 all year (no daylight saving), so no time-zone library is needed.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -106,29 +106,29 @@
     return { available: true, reason: null };
   }
 
+  /** Statuses after which nothing more happens to an order. */
+  const FINAL_STATUSES = ['COLLECTED', 'CANCELLED', 'NO_SHOW'];
+
   /**
-   * Order status from the clock (Sprint 1 has no vendor screen yet, so the
-   * kitchen steps are simulated): Received -> Preparing (prep time before
-   * pickup) -> Ready (from the pickup time). COLLECTED/CANCELLED are final.
+   * Live view of an order. The STATUS is the one saved on the server, set by
+   * the vendor (Received -> Preparing -> Ready -> Collected, or Cancelled /
+   * No-show). The clock only drives the countdown to the pickup time and the
+   * progress ring, so the page can tick every second without asking the server.
    */
   function orderStatus(order, clock) {
-    if (order.storedStatus === 'COLLECTED' || order.storedStatus === 'CANCELLED') {
-      return { status: order.storedStatus, secondsToReady: 0, progress: 1 };
-    }
+    const status = order.storedStatus || order.status || 'RECEIVED';
+    if (FINAL_STATUSES.includes(status)) return { status, secondsToReady: 0, progress: 1, final: true, expired: false };
     const ready = toMin(order.pickupStart);
-    const prepStart = ready - order.prepMinutes;
     const placed = order.placedMinutes;
     // Minutes since the order day began (handles the demo clock moving to another day).
     const dayShift = order.date === clock.date ? 0 : (order.date < clock.date ? 1e6 : -1e6);
     const now = clock.minutes + dayShift;
-    const secondsToReady = Math.max(0, Math.round((ready - now) * 60));
     const span = Math.max(1, ready - placed);
-    const progress = Math.min(1, Math.max(0, (now - placed) / span));
-    let status = 'RECEIVED';
-    if (now >= ready) status = 'READY';
-    else if (now >= prepStart) status = 'PREPARING';
+    const isReady = status === 'READY';
+    const secondsToReady = isReady ? 0 : Math.max(0, Math.round((ready - now) * 60));
+    const progress = isReady ? 1 : Math.min(1, Math.max(0, (now - placed) / span));
     const expired = now >= toMin(order.pickupEnd) + READY_HOLD_MINUTES;
-    return { status, secondsToReady, progress, prepStart: toHHMM(prepStart), expired };
+    return { status, secondsToReady, progress, prepStart: toHHMM(ready - order.prepMinutes), expired, final: false };
   }
 
   /** 754 -> "12:34" (mm:ss), or "1 h 05 min" for long waits. */
@@ -140,6 +140,6 @@
 
   return {
     SLOT_MINUTES, DAY_NAMES, toMin, toHHMM, clockAt, safeOffset, offsetFor,
-    hoursFor, hoursText, stallState, slotState, orderStatus, formatCountdown,
+    hoursFor, hoursText, stallState, slotState, orderStatus, formatCountdown, FINAL_STATUSES,
   };
 });

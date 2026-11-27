@@ -2,6 +2,7 @@
 // Each function makes as few queries as possible, because on the live site
 // every query is a network trip to Turso.
 const Schedule = require('../public/js/schedule');
+const config = require('./config');
 
 /** Database row -> stall object used by the schedule rules. */
 function toStall(row) {
@@ -33,7 +34,7 @@ async function allStalls(db) {
   return (await db.all('SELECT * FROM stalls ORDER BY stall_id')).map(toStall);
 }
 
-/** Orders already booked per pickup window on one day: Map(slotId -> count). */
+/** Orders holding a place in each pickup window on one day (cancelled orders free theirs): Map(slotId -> count). */
 async function slotUsage(db, date, stallId = null) {
   const rows = await db.all(`SELECT o.pickup_slot_id AS id, COUNT(*) AS n FROM orders o
     WHERE o.order_date = ? AND o.status != 'CANCELLED' ${stallId ? 'AND o.stall_id = ?' : ''}
@@ -59,7 +60,8 @@ function slotStates(stall, rows, clock, usage) {
   return (rows || []).map((r) => {
     const slot = {
       id: Number(r.pickup_slot_id), start: r.start_time, end: r.end_time,
-      capacity: Number(r.capacity), isBlocked: Boolean(r.is_blocked),
+      // A slot without its own capacity uses SLOT_CAPACITY from src/config.js.
+      capacity: r.capacity == null ? config.SLOT_CAPACITY : Number(r.capacity), isBlocked: Boolean(r.is_blocked),
     };
     const booked = usage.get(slot.id) || 0;
     const { available, reason } = Schedule.slotState(stall, slot, clock, booked);

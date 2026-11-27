@@ -3,76 +3,17 @@
 // Tuesday 24 November 2026, 10:00 Bangkok time.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const crypto = require('node:crypto');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const { DatabaseSync } = require('node:sqlite');
-const { openDb } = require('../src/db');
-const { createApp } = require('../src/app');
+const config = require('../src/config');
+const { useApp, MIN, TUESDAY_10AM } = require('./helpers');
 
-const TUESDAY_10AM = Date.UTC(2026, 10, 24, 3, 0); // 10:00 in Bangkok (UTC+7)
-const MIN = 60 * 1000;
-
-/** Start the app on a random port with a fresh seeded DB and a movable clock. */
-async function start() {
-  // A fresh database file per test; the app talks to it through libSQL (as on
-  // the live site) and the test reads it directly with node:sqlite.
-  const file = path.join(TMP_DIR, `${crypto.randomUUID()}.db`);
-  const appDb = await openDb({ url: `file:${file.split(path.sep).join('/')}` });
-  const db = new DatabaseSync(file);
-  const clock = { ms: TUESDAY_10AM };
-  const server = createApp(appDb, { now: () => clock.ms }).listen(0);
-  await new Promise((r) => server.once('listening', r));
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const call = async (method, p, data, headers = {}) => {
-    const res = await fetch(base + p, {
-      method, headers: { 'Content-Type': 'application/json', ...headers }, body: data ? JSON.stringify(data) : undefined,
-    });
-    return { status: res.status, body: await res.json() };
-  };
-  return {
-    db, clock,
-    get: (p, headers) => call('GET', p, null, headers),
-    post: (p, data, headers) => call('POST', p, data, headers),
-    /** Move the fixed clock to Tuesday at HH:MM. */
-    at(hhmm) { const [h, m] = hhmm.split(':').map(Number); clock.ms = TUESDAY_10AM + ((h - 10) * 60 + m) * MIN; },
-    orderCount: () => db.prepare('SELECT COUNT(*) AS n FROM orders').get().n,
-    id: (table, col, where, ...args) => db.prepare(`SELECT ${col} AS v FROM ${table} WHERE ${where}`).get(...args).v,
-    close: () => {
-      server.close();
-      db.close();
-      appDb.close();
-      // Windows may still hold the file for a moment; the folder is removed after all tests.
-    },
-  };
-}
-
-const TMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'canteenflow-test-'));
-test.after(() => { try { fs.rmSync(TMP_DIR, { recursive: true, force: true }); } catch (e) { /* locked on Windows: OS cleans temp */ } });
-
+const app = useApp();
 let ctx;
-test.beforeEach(async () => { ctx = await start(); });
-test.afterEach(() => ctx.close());
+test.beforeEach(() => { ctx = app(); });
 
-const stallId = (slug) => ctx.id('stalls', 'stall_id', 'slug = ?', slug);
-const itemId = (name) => ctx.id('menu_items', 'menu_item_id', 'name = ?', name);
-const slotId = (slug, time) => ctx.id('pickup_slots', 'pickup_slot_id', 'stall_id = ? AND start_time = ?', stallId(slug), time);
-
-/** A valid Siam Cafe order for 11:30; each test breaks one rule. */
-function validOrder(over = {}) {
-  return {
-    submissionToken: crypto.randomUUID(),
-    stallId: stallId('siam-cafe'),
-    items: [
-      { menuItemId: itemId('Stir-fried basil pork on rice'), quantity: 2 },
-      { menuItemId: itemId('Thai iced tea'), quantity: 1 },
-    ],
-    pickupSlotId: slotId('siam-cafe', '11:30'),
-    customer: { name: 'Somchai', studentId: '6605142003', phone: '081-234-5678' },
-    ...over,
-  };
-}
+const stallId = (slug) => ctx.stallId(slug);
+const itemId = (name) => ctx.itemId(name);
+const slotId = (slug, time) => ctx.slotId(slug, time);
+const validOrder = (over) => ctx.validOrder(over);
 
 // ---- US-01 Find a suitable campus stall ----
 
@@ -215,17 +156,17 @@ test('a slot that has passed, or is too soon to cook, is unavailable', async () 
 });
 
 test('a slot becomes unavailable when it is full', async () => {
-  const slot = slotId('main-cafeteria-japanese', '11:00'); // capacity 3
+  const slot = slotId('main-cafeteria-japanese', '11:00'); // capacity = config.SLOT_CAPACITY
   const order = () => validOrder({
     stallId: stallId('main-cafeteria-japanese'),
     items: [{ menuItemId: itemId('Chicken teriyaki rice bowl'), quantity: 1 }],
     pickupSlotId: slot,
   });
-  for (let i = 0; i < 3; i++) assert.equal((await ctx.post('/api/orders', order())).status, 201);
-  const fourth = await ctx.post('/api/orders', order());
-  assert.equal(fourth.status, 409);
-  assert.match(fourth.body.error, /full/);
-  assert.equal(ctx.orderCount(), 3);
+  for (let i = 0; i < config.SLOT_CAPACITY; i++) assert.equal((await ctx.post('/api/orders', order())).status, 201);
+  const extra = await ctx.post('/api/orders', order());
+  assert.equal(extra.status, 409);
+  assert.match(extra.body.error, /full/);
+  assert.equal(ctx.orderCount(), config.SLOT_CAPACITY);
 });
 
 test('a slot from another stall is rejected', async () => {
@@ -289,15 +230,15 @@ test('students can pre-order before a stall opens', async () => {
   assert.equal(body.order.status, 'RECEIVED');
 });
 
-test('order status follows the timer: Received, then Preparing, then Ready', async () => {
+test('order status is set by the vendor, not by the clock', async () => {
+  // Sprint 1 moved the status on a timer. Now the stall's vendor moves it, so
+  // passing time alone leaves the order Received (see test/rules.test.js).
   const { body } = await ctx.post('/api/orders', validOrder()); // 11:30 pickup, 10 min prep
   const n = body.order.orderNumber;
   const status = async () => (await ctx.get(`/api/orders/${n}`)).body.order.status;
   assert.equal(await status(), 'RECEIVED');
-  ctx.at('11:21');
-  assert.equal(await status(), 'PREPARING');
-  ctx.at('11:30');
-  assert.equal(await status(), 'READY');
+  ctx.at('11:31');
+  assert.equal(await status(), 'RECEIVED');
   assert.equal((await ctx.get('/api/orders/CF-NOPE00')).status, 404);
 });
 
@@ -314,10 +255,11 @@ test('orders arriving at the same moment never overbook a slot', async () => {
   const order = () => validOrder({
     stallId: stallId('main-cafeteria-japanese'),
     items: [{ menuItemId: itemId('Salmon rice bowl'), quantity: 1 }],
-    pickupSlotId: slotId('main-cafeteria-japanese', '13:00'), // capacity 3
+    pickupSlotId: slotId('main-cafeteria-japanese', '13:00'), // capacity = config.SLOT_CAPACITY
   });
-  const results = await Promise.all(Array.from({ length: 6 }, () => ctx.post('/api/orders', order())));
-  assert.equal(results.filter((r) => r.status === 201).length, 3);
+  const tries = config.SLOT_CAPACITY + 3;
+  const results = await Promise.all(Array.from({ length: tries }, () => ctx.post('/api/orders', order())));
+  assert.equal(results.filter((r) => r.status === 201).length, config.SLOT_CAPACITY);
   assert.equal(results.filter((r) => r.status === 409).length, 3);
-  assert.equal(ctx.orderCount(), 3);
+  assert.equal(ctx.orderCount(), config.SLOT_CAPACITY);
 });

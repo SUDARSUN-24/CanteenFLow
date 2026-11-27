@@ -18,7 +18,7 @@ const STALLS = [
     prep_minutes: 10,
     description: 'Made-to-order Thai rice and noodle dishes (อาหารตามสั่ง).',
     data_label: 'Real place (unverified listing). Menu prices are demo data.',
-    slots: { capacity: 4, blocked: ['12:00', '12:15'] },
+    slots: { blocked: ['12:00', '12:15'] },
     menu: [
       ['Stir-fried basil pork on rice', 'ข้าวกะเพราหมู', 'Rice dishes', 50, 'rice', 1],
       ['Pork fried rice', 'ข้าวผัดหมู', 'Rice dishes', 50, 'rice', 1],
@@ -40,7 +40,7 @@ const STALLS = [
     prep_minutes: 15,
     description: 'One-plate meals (อาหารจานเดียว).',
     data_label: 'Real place (unverified listing). Hours and prices are demo data.',
-    slots: { capacity: 4, blocked: [] },
+    slots: { blocked: [] },
     menu: [
       ['Stir-fried noodles with water mimosa and shrimp', 'หมี่ผัดกระเฉดกุ้ง', 'Noodles', 120, 'noodles', 1],
       ['Gravy noodles with pork', 'ราดหน้าหมู', 'Noodles', 90, 'noodles', 1],
@@ -61,7 +61,7 @@ const STALLS = [
     prep_minutes: 12,
     description: 'Rice bowls and sides.',
     data_label: 'The Main Cafeteria serves Japanese food (verified). This counter, its hours and prices are demo data.',
-    slots: { capacity: 3, blocked: ['12:00'] },
+    slots: { blocked: ['12:00'] },
     menu: [
       ['Chicken teriyaki rice bowl', 'ข้าวหน้าไก่เทอริยากิ', 'Rice bowls', 65, 'bento', 1],
       ['Pork katsu curry rice', 'ข้าวแกงกะหรี่หมูทอด', 'Rice bowls', 75, 'bowl', 0], // Sold Out
@@ -82,7 +82,7 @@ const STALLS = [
     prep_minutes: 12,
     description: 'Bibimbap, kimbap and street snacks.',
     data_label: 'The Main Cafeteria serves Korean food (verified). This counter, its hours and prices are demo data.',
-    slots: { capacity: 3, blocked: ['12:30'] },
+    slots: { blocked: ['12:30'] },
     menu: [
       ['Bibimbap', 'บิบิมบับ', 'Rice dishes', 70, 'bowl', 1],
       ['Kimchi fried rice', 'ข้าวผัดกิมจิ', 'Rice dishes', 60, 'rice', 1],
@@ -103,7 +103,7 @@ const STALLS = [
     prep_minutes: 6,
     description: 'Quick noodle soups and snacks.',
     data_label: 'The Thai Pavilion has a cafeteria (verified). This counter, its hours and prices are demo data.',
-    slots: { capacity: 4, blocked: [] },
+    slots: { blocked: [] },
     menu: [
       ['Boat noodles', 'ก๋วยเตี๋ยวเรือ', 'Noodle soups', 45, 'noodles', 1],
       ['Tom yum noodles', 'ก๋วยเตี๋ยวต้มยำ', 'Noodle soups', 50, 'noodles', 1],
@@ -126,7 +126,7 @@ const STALLS = [
     closed_note: 'Closed today (demo data).',
     description: 'Set lunches with a view from the 9th floor.',
     data_label: 'Location verified. Hours unverified. Menu, prices and "closed today" are demo data.',
-    slots: { capacity: 4, blocked: [] },
+    slots: { blocked: [] },
     menu: [
       ['Chicken massaman curry with rice', 'ข้าวแกงมัสมั่นไก่', 'Set lunch', 120, 'bowl', 1],
       ['Spaghetti carbonara', 'สปาเกตตีคาโบนารา', 'Set lunch', 130, 'noodles', 1],
@@ -146,7 +146,7 @@ const STALLS = [
     prep_minutes: 5,
     description: 'Bubble tea, coffee and soda.',
     data_label: 'Real place (unverified, 2018 listing). Hours and prices are demo data.',
-    slots: { capacity: 6, blocked: ['12:00'] },
+    slots: { blocked: ['12:00'] },
     menu: [
       ['Bubble milk tea', 'ชานมไข่มุก', 'Tea', 45, 'bubbletea', 1],
       ['Thai tea with pearls', 'ชาไทยไข่มุก', 'Tea', 45, 'bubbletea', 1],
@@ -186,6 +186,12 @@ function slotTimes(hours) {
 }
 
 /**
+ * Demo vendor PIN for stall `id`: 1001 for stall 1, 1002 for stall 2, ...
+ * Listed in the README. It only separates the stalls in the demo; it is not real security.
+ */
+const demoVendorPin = (id) => String(1000 + id);
+
+/**
  * All seed rows as SQL statements with fixed ids, so they can run in one
  * atomic batch (locally or on Turso). Stall ids are 1..7 in the order above.
  */
@@ -199,9 +205,9 @@ function seedStatements() {
     idBySlug[s.slug] = id;
     out.push({
       sql: `INSERT INTO stalls (stall_id, slug, name, name_th, area, cuisine, hours_json, hours_label,
-            prep_minutes, is_open_today, closed_note, description, data_label) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            prep_minutes, is_open_today, closed_note, description, data_label, vendor_pin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [id, s.slug, s.name, s.name_th, s.area, s.cuisine, JSON.stringify(s.hours), s.hours_label,
-        s.prep_minutes, s.is_open_today ?? 1, s.closed_note ?? null, s.description, s.data_label],
+        s.prep_minutes, s.is_open_today ?? 1, s.closed_note ?? null, s.description, s.data_label, demoVendorPin(id)],
     });
     for (const [name, th, cat, price, img, avail] of s.menu) {
       out.push({
@@ -212,7 +218,7 @@ function seedStatements() {
     for (const t of slotTimes(s.hours)) {
       out.push({
         sql: 'INSERT INTO pickup_slots (pickup_slot_id, stall_id, start_time, end_time, capacity, is_blocked) VALUES (?, ?, ?, ?, ?, ?)',
-        args: [++slotId, id, t, toHHMM(toMin(t) + SLOT_MINUTES), s.slots.capacity, s.slots.blocked.includes(t) ? 1 : 0],
+        args: [++slotId, id, t, toHHMM(toMin(t) + SLOT_MINUTES), null, s.slots.blocked.includes(t) ? 1 : 0], // capacity from config
       });
     }
   });
@@ -225,4 +231,4 @@ function seedStatements() {
   return out;
 }
 
-module.exports = { seedStatements, STALLS };
+module.exports = { seedStatements, STALLS, demoVendorPin };

@@ -33,16 +33,18 @@ test('slot rules: past, too soon, paused, full, outside hours, available', () =>
   assert.equal(S.slotState(stall, slot('08:30'), clock(6, '07:00')).reason, 'Closed');
 });
 
-test('order timer counts down and moves Received -> Preparing -> Ready', () => {
-  const order = { date: '2026-11-23', placedMinutes: S.toMin('11:00'), prepMinutes: 10, pickupStart: '11:30', pickupEnd: '11:45' };
+test('order countdown runs on the clock; the status is the stored one', () => {
+  const order = { date: '2026-11-23', storedStatus: 'RECEIVED', placedMinutes: S.toMin('11:00'), prepMinutes: 10, pickupStart: '11:30', pickupEnd: '11:45' };
   const a = S.orderStatus(order, clock(1, '11:05'));
   assert.equal(a.status, 'RECEIVED');
   assert.equal(a.secondsToReady, 25 * 60);
   assert.equal(S.formatCountdown(a.secondsToReady), '25:00');
-  assert.equal(S.orderStatus(order, clock(1, '11:20')).status, 'PREPARING');
-  const ready = S.orderStatus(order, clock(1, '11:31'));
+  // Time passing does not change the status: the vendor does.
+  assert.equal(S.orderStatus(order, clock(1, '11:31')).status, 'RECEIVED');
+  const ready = S.orderStatus({ ...order, storedStatus: 'READY' }, clock(1, '11:20'));
   assert.equal(ready.status, 'READY');
   assert.equal(ready.secondsToReady, 0);
+  for (const final of ['COLLECTED', 'CANCELLED', 'NO_SHOW']) assert.equal(S.orderStatus({ ...order, storedStatus: final }, clock(1, '11:05')).final, true);
   assert.equal(S.orderStatus(order, clock(2, '09:00', '2026-11-24')).expired, true);
 });
 

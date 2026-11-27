@@ -16,8 +16,8 @@ time, so they can collect their food without waiting in a long queue. They pay a
 | Student name | Sudasun |
 | Student ID | 6605142003 |
 | Team | Dagabaaz Re |
-| Course | Agile (Sprint 1 demo) |
-| Last updated | 26 November 2026 |
+| Course | Agile (Sprint 1 and 2 demo) |
+| Last updated | 27 November 2026 |
 
 ## Run it
 
@@ -30,7 +30,7 @@ npm install && npm start
 Then open **http://localhost:3000**. The SQLite database is created and seeded the first time
 (`data/canteenflow.db`). To start again with fresh data: `npm run reset-db`.
 
-Run the automated tests (38 tests, about 1 second):
+Run the automated tests (61 tests, a few seconds):
 
 ```bash
 npm test
@@ -65,7 +65,98 @@ The server re-checks every rule when an order is placed. Hand-made requests cann
 | One stall per order | Checked in the browser (warning dialog) and on the server. |
 | Total | Always calculated on the server from database prices. A price sent by the browser is ignored. |
 | Duplicate order | Each checkout sends a submission token. The same token returns the existing order instead of creating a new one. The button is also locked while the order is being sent. |
-| Order status | Received → **Preparing** one prep time before pickup → **Ready** at the pickup time. Sprint 1 has no vendor screen, so these steps follow a timer. |
+| Order status | Set by the stall on the vendor page: Received → Preparing → Ready → Collected, or Cancelled / No-show. (In Sprint 1 these steps followed a timer.) |
+
+## Sprint 2: cancellation and vendor protection
+
+User stories with acceptance criteria and Given / When / Then examples:
+[Docs/USER_STORIES.md](Docs/USER_STORIES.md).
+
+| Story | What works |
+|---|---|
+| **US-06 Cancel my order** | **My orders** shows each order's number and its status from the stall. A **Cancel order** button appears only while the order is *Received*. A confirmation comes first. A clear message appears if it is too late. A cancelled order shows who cancelled it and when, and its pickup place is released. |
+| **US-07 Vendor accepts or rejects an order** | **Vendor page** (`/vendor`): demo sign-in per stall. The vendor sees only their stall's orders and can **Accept** (→ Preparing) or **Reject** with a required reason, then mark **Ready** and **Collected**, or **Cancel** with a reason. The student sees the reason. There is also a **Sold Out** switch for each menu item. |
+| **US-08 Vendor marks a no-show** | **No-show** on a *Ready* order once its pickup window has ended. After the No-show limit, a student's new orders are refused with a polite message to contact the stall. |
+| **US-09 Limit orders per student** | Ordering needs a demo student ID (any 10 digits). A student can hold only a limited number of active orders at a time. |
+| **US-10 Slot capacity** | Every pickup slot takes a set number of orders. A full slot is unavailable, and a cancelled or rejected order frees its place. |
+
+### Business rules (proposals: to be confirmed with Study Lab)
+
+Every number is in **one file, [`src/config.js`](src/config.js)**. Change it there and the
+server, the API (`GET /api/config`) and the pages follow. The server checks every rule inside
+the same database transaction as the change itself, so the browser cannot get around them.
+
+| Rule | Config value | Default | What happens |
+|---|---|---|---|
+| Slot capacity | `SLOT_CAPACITY` | **5** orders per 15-minute slot | A full slot is unavailable. A cancelled or rejected order frees its place. |
+| Active orders per student | `MAX_ACTIVE_ORDERS_PER_STUDENT` | **2** | Received, Preparing and Ready orders for today or later count. More are refused. |
+| No-show limit | `NO_SHOW_LIMIT` | **3** | At this many No-shows, new orders from that student ID are refused politely. |
+| Cancel window | `CANCEL_WINDOW_STATUSES` | **Received** only | Once the stall accepts (Preparing), a student can no longer cancel. |
+| Student ID | `STUDENT_ID_DIGITS` | **10** digits | Demo only: any 10 digits. No password and no real check. |
+| Vendor reason | `REASON_MAX_CHARS` | **200** characters | Required to reject or cancel. Shown to the student. |
+| Vendor sign-in | `VENDOR_SESSION_HOURS` | **12** hours | After this the vendor signs in again. |
+
+Order statuses and who can change them:
+
+| From | To | Who | Condition |
+|---|---|---|---|
+| Received | Cancelled | Student | Only their own order (same student ID). Repeat presses are harmless. |
+| Received | Preparing | Vendor (Accept) | |
+| Received | Cancelled | Vendor (Reject) | Reason required |
+| Preparing | Ready | Vendor | |
+| Preparing or Ready | Cancelled | Vendor (Cancel) | Reason required |
+| Ready | Collected | Vendor | |
+| Ready | No-show | Vendor | Only after the pickup window has ended |
+
+Other protections:
+
+- The vendor's sign-in names one stall, so the vendor never sees another stall's orders. An
+  order or menu item from another stall is answered with "not found".
+- The vendor sees the student's name, phone and only the last 4 digits of the student ID.
+- Duplicate orders are still blocked by the US-05 submission token, even when a student is at
+  their limit.
+- Every status change is a conditional update ("only if the status is still X"). If a student
+  cancels while the vendor accepts at the same moment, exactly one of them wins.
+
+### Using the vendor page (demo)
+
+Open **/vendor** (there is also a link in the footer), choose the stall and type its demo PIN.
+The PINs are public on purpose. This is a course demo, not real security.
+
+| Stall | Demo PIN |
+|---|---|
+| Siam Cafe | 1001 |
+| Krua Sai Jai Cafe (branch 4) | 1002 |
+| Main Cafeteria – Japanese counter | 1003 |
+| Main Cafeteria – Korean counter | 1004 |
+| Thai Pavilion – Noodle counter | 1005 |
+| Sky Lounge Restaurant | 1006 |
+| Hello Tea & Coffee | 1007 |
+
+To try the whole flow: place an order as a student, then open `/vendor` in another browser (or a
+private window) and accept, reject or complete it. The student's My orders page and tracker
+update within about 10 seconds.
+
+### Rules that still need a decision from Study Lab
+
+1. **Numbers.** Are 5 orders per slot, 2 active orders and 3 No-shows right? Should the slot
+   capacity differ per stall or per time of day? (The database already allows a per-slot
+   capacity; it is not used yet.)
+2. **Cancel window.** Is "only while Received" enough? Should there also be a time limit (for
+   example, no cancelling within 10 minutes of pickup) even if the stall has not accepted yet?
+   And what happens if a stall never accepts an order?
+3. **No-shows.** Do they count forever, or reset after some time (a week, a term)? Who can lift
+   a block, and how? There is no unblock screen yet. A block covers every stall: should it?
+   Should there be a grace period after the pickup window before a No-show can be marked?
+4. **Active orders.** Should orders for future days (pre-orders) count toward the limit? Should
+   an order still Ready from an earlier day count? Today it does not.
+5. **Vendor cancellations.** May a vendor cancel after the food is ready? Should the student be
+   told in another way (for example, a message) and not only on the website?
+6. **Identity.** Will real students sign in with the university account instead of typing a
+   student ID? Until then, anyone who knows an order number and the student ID can cancel it.
+7. **Personal data.** How long should names, phone numbers and student IDs be kept, and who may
+   see them? The vendor sees the name, phone and the last 4 digits of the ID.
+8. **Vendor accounts.** Real vendor accounts and passwords will replace the demo PINs.
 
 ## Tech
 
@@ -79,8 +170,10 @@ The server re-checks every rule when an order is placed. Hand-made requests cann
 ```text
 server.js              local server (npm start)
 api/index.js           Vercel serverless entry
+src/config.js          business rule numbers (to be confirmed with Study Lab)
 src/app.js             API routes
-src/orders.js          order validation and placing
+src/orders.js          order validation, placing, cancelling and vendor actions
+src/vendor.js          demo vendor sign-in (signed token per stall)
 src/data.js            database row helpers, live slot availability
 src/db.js              libSQL connection (local file or Turso), schema, seed
 src/seed.js            researched stalls, menus, hours, slots
@@ -88,9 +181,9 @@ public/                pages, styles, images and browser scripts
 public/js/campus-map.js  3D campus map
 public/js/kiosk.js     3D stall models
 public/data/           campus map data from OpenStreetMap
-test/                  39 automated tests (node:test)
+test/                  61 automated tests (node:test): api, rules, cart, schedule
 data/SOURCES.md        research: verified / unverified / demo data
-Docs/                  Lab 2-3 planning documents
+Docs/                  Lab 2-3 planning documents and USER_STORIES.md (Sprint 2)
 ```
 
 ## What is real and what is demo data
@@ -112,8 +205,8 @@ pages come from `public/`, and the API runs as one serverless function (`api/ind
 (hosted SQLite, free Starter plan, Tokyo region), connected through Vercel → Storage, which sets
 `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`. Orders persist and are shared by every server
 copy. Placing an order runs in one write transaction (duplicate check, Sold Out check, slot
-capacity check and insert together), so two copies can never overbook a slot. A test fires six
-orders at once at a slot that holds three, and exactly three succeed.
+capacity check and insert together), so two copies can never overbook a slot. A test fires eight
+orders at once at a slot that holds five, and exactly five succeed.
 
 Without those variables (for example in a fork) the function falls back to a temporary SQLite file in `/tmp`, which is
 re-seeded when Vercel starts a new copy. Orders are then temporary on the live site, but the
@@ -124,11 +217,11 @@ browser keeps its own copy, so the order tracker on that device always works.
 
 - **SQLite** instead of PostgreSQL. The team asked for a simple one-command stack. The tables follow the [database design](Docs/Database-Design-CanteenFlow.md).
 - Pickup slots are only available or unavailable. Capacity and "too soon" make a slot unavailable.
-- The vendor flow (sign in, change status, mark Sold Out) is **not** in Sprint 1. Status changes follow a timer, and Sold Out is set in the seed data.
+- The vendor flow (sign in, change status, mark Sold Out) arrived in Sprint 2. Vendor sign-in is a demo PIN per stall, not real accounts.
 
 ## Next sprint ideas
 
-A vendor screen (order queue, status buttons, Sold Out switch), and real menus and prices collected from the stalls with their permission.
+Real student and vendor sign-in, notifications when an order is ready or cancelled, a way for stalls to lift a No-show block, and real menus and prices collected from the stalls with their permission.
 
 ## License
 

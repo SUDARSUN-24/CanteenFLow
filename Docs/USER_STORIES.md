@@ -1,5 +1,7 @@
 # CanteenFlow: Sprint 2 User Stories (cancellation and vendor protection)
 
+Story numbers match the team's Trello board (US-16 to US-20).
+
 These stories add order cancellation and protect stall vendors from orders that
 are never collected. They build on the Sprint 1 stories (US-01, US-02, US-04, US-05)
 and on the vendor acceptance criteria AC-15 to AC-21 in
@@ -15,17 +17,17 @@ The vendor moves an order forward. The server checks every rule, whatever the br
 
 | ID | Story | Automated tests |
 |---|---|---|
-| US-06 | Cancel my order | `test/rules.test.js` (5 tests) |
-| US-07 | Vendor accepts or rejects an order | `test/rules.test.js` (7 tests, including Sold Out) |
-| US-08 | Vendor marks a no-show | `test/rules.test.js` (2 tests) |
-| US-09 | Limit orders per student | `test/rules.test.js` (4 tests) |
-| US-10 | Slot capacity | `test/rules.test.js` (3 tests), `test/api.test.js` (2 tests) |
+| US-16 | Cancel my order | `test/rules.test.js` (5 tests) |
+| US-17 | Vendor accepts or rejects an order | `test/rules.test.js` (7 tests, including Sold Out) |
+| US-18 | Vendor marks a no-show | `test/rules.test.js` (2 tests) |
+| US-19 | Limit orders per student | `test/rules.test.js` (4 tests) |
+| US-20 | Slot capacity | `test/rules.test.js` (3 tests), `test/api.test.js` (2 tests) |
 
 One more test checks that the rule numbers come from `src/config.js`.
 
 ---
 
-## US-06 Cancel my order
+## US-16 Cancel my order
 
 **As a** student, **I want to** cancel an order I no longer need before the stall starts
 cooking it, **so that** no food is wasted and my pickup place goes to someone else.
@@ -65,7 +67,7 @@ cooking it, **so that** no food is wasted and my pickup place goes to someone el
 
 ---
 
-## US-07 Vendor accepts or rejects an order
+## US-17 Vendor accepts or rejects an order
 
 **As a** stall vendor, **I want to** accept or reject each new order and move it through the
 kitchen steps, **so that** I only cook what I can make and students know where their food is.
@@ -112,7 +114,7 @@ kitchen steps, **so that** I only cook what I can make and students know where t
 
 ---
 
-## US-08 Vendor marks a no-show
+## US-18 Vendor marks a no-show
 
 **As a** stall vendor, **I want to** record when a student never collects a ready order,
 **so that** students who repeatedly waste food can be stopped from ordering.
@@ -143,7 +145,7 @@ kitchen steps, **so that** I only cook what I can make and students know where t
 
 ---
 
-## US-09 Limit orders per student
+## US-19 Limit orders per student
 
 **As a** stall vendor, **I want** each student to hold only a few active orders at a time,
 **so that** one person cannot reserve many pickup places and leave them uncollected.
@@ -175,7 +177,7 @@ kitchen steps, **so that** I only cook what I can make and students know where t
 
 ---
 
-## US-10 Slot capacity
+## US-20 Slot capacity
 
 **As a** stall vendor, **I want** each 15-minute pickup slot to take only as many orders as I can
 prepare, **so that** I am never overbooked at rush hour.

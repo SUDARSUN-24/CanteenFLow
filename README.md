@@ -74,11 +74,11 @@ User stories with acceptance criteria and Given / When / Then examples:
 
 | Story | What works |
 |---|---|
-| **US-06 Cancel my order** | **My orders** shows each order's number and its status from the stall. A **Cancel order** button appears only while the order is *Received*. A confirmation comes first. A clear message appears if it is too late. A cancelled order shows who cancelled it and when, and its pickup place is released. |
-| **US-07 Vendor accepts or rejects an order** | **Vendor page** (`/vendor`): demo sign-in per stall. The vendor sees only their stall's orders and can **Accept** (→ Preparing) or **Reject** with a required reason, then mark **Ready** and **Collected**, or **Cancel** with a reason. The student sees the reason. There is also a **Sold Out** switch for each menu item. |
-| **US-08 Vendor marks a no-show** | **No-show** on a *Ready* order once its pickup window has ended. After the No-show limit, a student's new orders are refused with a polite message to contact the stall. |
-| **US-09 Limit orders per student** | Ordering needs a demo student ID (any 10 digits). A student can hold only a limited number of active orders at a time. |
-| **US-10 Slot capacity** | Every pickup slot takes a set number of orders. A full slot is unavailable, and a cancelled or rejected order frees its place. |
+| **US-16 Cancel my order** | **My orders** shows each order's number and its status from the stall. A **Cancel order** button appears only while the order is *Received*. A confirmation comes first. A clear message appears if it is too late. A cancelled order shows who cancelled it and when, and its pickup place is released. |
+| **US-17 Vendor accepts or rejects an order** | **Vendor page** (`/vendor`): demo sign-in per stall. The vendor sees only their stall's orders and can **Accept** (→ Preparing) or **Reject** with a required reason, then mark **Ready** and **Collected**, or **Cancel** with a reason. The student sees the reason. There is also a **Sold Out** switch for each menu item. |
+| **US-18 Vendor marks a no-show** | **No-show** on a *Ready* order once its pickup window has ended. After the No-show limit, a student's new orders are refused with a polite message to contact the stall. |
+| **US-19 Limit orders per student** | Ordering needs a demo student ID (any 10 digits). A student can hold only a limited number of active orders at a time. |
+| **US-20 Slot capacity** | Every pickup slot takes a set number of orders. A full slot is unavailable, and a cancelled or rejected order frees its place. |
 
 ### Business rules (proposals: to be confirmed with Study Lab)
 

@@ -155,6 +155,7 @@ test('a slot that has passed, or is too soon to cook, is unavailable', async () 
   assert.equal(ctx.orderCount(), 0);
 });
 
+// Also covers US-20 Slot capacity.
 test('a slot becomes unavailable when it is full', async () => {
   const slot = slotId('main-cafeteria-japanese', '11:00'); // capacity = config.SLOT_CAPACITY
   const order = () => validOrder({
@@ -230,9 +231,10 @@ test('students can pre-order before a stall opens', async () => {
   assert.equal(body.order.status, 'RECEIVED');
 });
 
+// The vendor's status changes are tested under US-17 in test/rules.test.js.
 test('order status is set by the vendor, not by the clock', async () => {
   // Sprint 1 moved the status on a timer. Now the stall's vendor moves it, so
-  // passing time alone leaves the order Received (see test/rules.test.js).
+  // passing time alone leaves the order Received.
   const { body } = await ctx.post('/api/orders', validOrder()); // 11:30 pickup, 10 min prep
   const n = body.order.orderNumber;
   const status = async () => (await ctx.get(`/api/orders/${n}`)).body.order.status;
@@ -251,6 +253,7 @@ test('the demo clock header moves the server clock (bounded)', async () => {
   assert.equal(junk.body.clock.label, 'Tue 10:00');
 });
 
+// Also covers US-20 Slot capacity.
 test('orders arriving at the same moment never overbook a slot', async () => {
   const order = () => validOrder({
     stallId: stallId('main-cafeteria-japanese'),

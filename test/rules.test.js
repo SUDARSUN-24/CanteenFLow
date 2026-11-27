@@ -1,4 +1,6 @@
-// Cancellation, per-student limits, no-show protection and the vendor page.
+// Sprint 2 stories (numbers from the team's Trello board): US-16 Cancel my order,
+// US-17 Vendor accepts or rejects an order, US-18 Vendor marks a no-show,
+// US-19 Limit orders per student, US-20 Slot capacity.
 // Every number comes from src/config.js, so these tests follow the config.
 // Run: npm test
 const test = require('node:test');
@@ -59,6 +61,7 @@ test('rule numbers come from src/config.js and are published at /api/config', as
   assert.deepEqual(body.rules, JSON.parse(JSON.stringify(config)));
 });
 
+// US-19 Limit orders per student: the student ID that the limits are applied to.
 test('ordering needs a demo student ID of exactly 10 digits', async () => {
   for (const bad of ['660514200', '66051420031', '66O5142003', '']) {
     const r = await place({}, bad);
@@ -69,7 +72,7 @@ test('ordering needs a demo student ID of exactly 10 digits', async () => {
   assert.equal(ctx.orderCount(), 1);
 });
 
-// ---- Cancel my order ----
+// ---- US-16 Cancel my order ----
 
 test('a student can cancel while the order is Received; it shows who cancelled and when', async () => {
   const sid = newStudentId();
@@ -125,7 +128,7 @@ test('a student cancel and a vendor accept at the same moment: exactly one wins'
   assert.ok(final === (c.status === 200 ? 'CANCELLED' : 'PREPARING'));
 });
 
-// ---- Slot capacity ----
+// ---- US-20 Slot capacity ----
 
 test('a full slot becomes unavailable and new orders for it are refused', async () => {
   const { order } = await fillSlot('11:00');
@@ -156,7 +159,7 @@ test('a vendor rejection also releases the slot', async () => {
   assert.equal((await ctx.post('/api/orders', order())).status, 201);
 });
 
-// ---- Limit orders per student ----
+// ---- US-19 Limit orders per student ----
 
 test(`a student can hold at most ${config.MAX_ACTIVE_ORDERS_PER_STUDENT} active orders`, async () => {
   const sid = newStudentId();
@@ -196,7 +199,7 @@ test('Place Order sent twice still returns the same order, even at the limit', a
   assert.equal(again.body.order.orderNumber, first.body.order.orderNumber);
 });
 
-// ---- Vendor marks a no-show / no-show limit ----
+// ---- US-18 Vendor marks a no-show (and the no-show limit) ----
 
 /** Place an order and take it through to No-show (after its pickup window). */
 async function noShow(sid, vendor) {
@@ -245,7 +248,7 @@ test(`after ${config.NO_SHOW_LIMIT} No-shows a student cannot order and sees a p
   assert.equal((await place({}, newStudentId())).status, 201, 'other students are not affected');
 });
 
-// ---- Vendor accepts or rejects an order ----
+// ---- US-17 Vendor accepts or rejects an order ----
 
 test('vendor sign-in needs the right PIN for that stall', async () => {
   const id = ctx.stallId('siam-cafe');
@@ -316,7 +319,7 @@ test('a vendor can cancel a Preparing order with a reason, shown to the student'
   assert.deepEqual([seen.status, seen.cancelledBy, seen.statusReason], ['CANCELLED', 'vendor', 'Gas ran out']);
 });
 
-// ---- Sold Out switch ----
+// ---- US-17 Vendor accepts or rejects an order: Sold Out switch ----
 
 test('vendor Sold Out switch stops new orders for that item, and back again', async () => {
   const vendor = await vendorOf('siam-cafe');

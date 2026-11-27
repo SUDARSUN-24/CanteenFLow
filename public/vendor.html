@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Vendor page · CanteenFlow</title>
+  <meta name="description" content="Stall vendor page: accept, reject and update orders, mark Sold Out.">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#0e7a57">
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <section class="page-head">
+      <p class="eyebrow">For stall staff</p>
+      <h1>Vendor page</h1>
+      <p class="lead" id="vendor-lead">Sign in with your stall's PIN to see and update its orders.</p>
+    </section>
+
+    <form class="panel vendor-login" id="login" hidden>
+      <div class="field">
+        <label for="v-stall">Stall</label>
+        <select id="v-stall" required></select>
+      </div>
+      <div class="field">
+        <label for="v-pin">PIN</label>
+        <input id="v-pin" type="password" inputmode="numeric" autocomplete="off" maxlength="12" required>
+        <div class="hint">Demo only: each stall's PIN is listed in the project README. It is not real security.</div>
+      </div>
+      <div class="error" id="login-error" role="alert"></div>
+      <button class="btn btn-block" type="submit" id="login-btn">Sign in</button>
+    </form>
+
+    <section id="desk" hidden>
+      <div class="vendor-bar">
+        <div>
+          <div class="muted" style="font-size:13px">Signed in as</div>
+          <strong id="v-name"></strong>
+        </div>
+        <div class="vendor-tabs" role="tablist">
+          <button class="chip" type="button" role="tab" id="tab-orders" aria-pressed="true">Orders</button>
+          <button class="chip" type="button" role="tab" id="tab-menu" aria-pressed="false">Menu &amp; Sold Out</button>
+        </div>
+        <button class="btn btn-ghost btn-small" type="button" id="logout">Sign out</button>
+      </div>
+      <div id="v-alert"></div>
+      <div id="v-orders"></div>
+      <div id="v-menu" hidden></div>
+    </section>
+  </main>
+  <script src="/js/cart.js"></script>
+  <script src="/js/schedule.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/vendor.js"></script>
+</body>
+</html>

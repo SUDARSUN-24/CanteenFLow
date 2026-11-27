@@ -247,7 +247,7 @@
 
     const footer = el('footer', {},
       el('div', { class: 'wrap' },
-        el('p', {}, el('strong', {}, 'CanteenFlow'), ' · Sprint 1 demo for the Agile course · team Dagabaaz Re.'),
+        el('p', {}, el('strong', {}, 'CanteenFlow'), ' · Sprint 1 and 2 demo for the Agile course · team Dagabaaz Re.'),
         el('p', {}, 'Stall names and buildings come from public sources. Prices, prep times, pickup slots and Sold Out states are demo data. ',
           el('a', { href: 'https://github.com/SUDARSUN-24/CanteenFLow/blob/main/data/SOURCES.md', target: '_blank', rel: 'noopener' }, 'Data sources'),
           ' · ', el('a', { href: '/map' }, 'Campus map'),

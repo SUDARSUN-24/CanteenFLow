@@ -1,5 +1,6 @@
-// Confirmation + live order tracker (US-05): order number, status "Received",
-// countdown to pickup, and Received -> Preparing -> Ready steps.
+// Confirmation + live order tracker (US-05): order number, status from the
+// stall (Received -> Preparing -> Ready -> Collected, or Cancelled / No-show,
+// with the stall's reason), and a countdown to the pickup time.
 (function () {
   const { api, el, myOrders, clock, toast, chime, STATUS_TEXT } = CF;
   const params = new URLSearchParams(location.search);
@@ -7,7 +8,7 @@
   const isNew = params.get('new') === '1';
   const root = document.getElementById('confirm');
   const RING = 2 * Math.PI * 82;
-  const STEPS = ['RECEIVED', 'PREPARING', 'READY'];
+  const STEPS = ['RECEIVED', 'PREPARING', 'READY', 'COLLECTED'];
 
   let order = null;
   let lastStatus = null;
@@ -81,7 +82,7 @@
       el('h3', {}, 'Items'), items,
       el('div', { class: 'total-row' }, el('span', {}, 'Total'), el('span', {}, Cart.baht(order.total))),
       el('p', { class: 'pay-note' }, el('span', { 'aria-hidden': 'true' }, '💵'), el('span', {}, `Pay ${Cart.baht(order.total)} at the stall when you collect.`)),
-      el('p', { class: 'sim-note' }, 'Sprint 1 demo: there is no vendor screen yet, so the kitchen steps follow a timer. Preparing starts one prep time before your pickup; Ready at the start of your pickup window.'));
+      el('p', { class: 'sim-note' }, 'The stall updates the status on its vendor page: Received → Preparing → Ready → Collected. You can cancel in My orders until the stall starts preparing.'));
 
     root.replaceChildren(
       el('a', { class: 'back', href: '/' }, '← Order something else'),
@@ -104,7 +105,18 @@
     ui.timer.classList.toggle('ready', st.status === 'READY');
     ui.bar.setAttribute('stroke-dashoffset', String(RING * (1 - st.progress)));
 
-    if (st.status === 'READY') {
+    if (st.final) {
+      const FINAL_TEXT = { COLLECTED: 'Collected', CANCELLED: 'Cancelled', NO_SHOW: 'No-show' };
+      ui.big.textContent = FINAL_TEXT[st.status];
+      ui.small.textContent = '';
+      ui.headline.textContent = st.status === 'COLLECTED' ? 'Collected. Enjoy your meal!'
+        : st.status === 'NO_SHOW' ? 'The stall marked this order as not collected (No-show).'
+          : order.cancelledBy === 'vendor' ? `Cancelled by the stall. Reason: ${order.statusReason || 'not given'}`
+            : `You cancelled this order${order.statusChangedAt ? ` at ${order.statusChangedAt.slice(11)}` : ''}. Its pickup place was released.`;
+      ui.hero.classList.toggle('is-cancelled', st.status !== 'COLLECTED');
+      ui.timer.setAttribute('aria-label', FINAL_TEXT[st.status]);
+      document.title = `${FINAL_TEXT[st.status]} · ${order.orderNumber}`;
+    } else if (st.status === 'READY') {
       ui.big.textContent = 'Ready!';
       ui.small.textContent = `Collect at ${order.stall.name}`;
       ui.headline.textContent = st.expired
@@ -117,14 +129,25 @@
       ui.big.textContent = left;
       ui.small.textContent = 'until ready';
       ui.headline.textContent = st.status === 'RECEIVED'
-        ? `The stall has your order. Cooking starts at ${st.prepStart}.`
+        ? 'Waiting for the stall to accept your order. You can still cancel it in My orders.'
         : `The stall is preparing your food now. Pickup from ${order.pickupStart}.`;
       ui.timer.setAttribute('aria-label', `Ready in ${left}`);
       document.title = `${left} · ${order.orderNumber}`;
     }
     if (lastStatus && lastStatus !== st.status) {
-      toast(`Status: ${STATUS_TEXT[st.status]}`);
-      if (st.status === 'READY') { chime(); confetti(ui.hero); }
+      toast(`Status: ${STATUS_TEXT[st.status]}`, st.status === 'CANCELLED' || st.status === 'NO_SHOW' ? 'error' : '');
+      if (st.final) {
+      const FINAL_TEXT = { COLLECTED: 'Collected', CANCELLED: 'Cancelled', NO_SHOW: 'No-show' };
+      ui.big.textContent = FINAL_TEXT[st.status];
+      ui.small.textContent = '';
+      ui.headline.textContent = st.status === 'COLLECTED' ? 'Collected. Enjoy your meal!'
+        : st.status === 'NO_SHOW' ? 'The stall marked this order as not collected (No-show).'
+          : order.cancelledBy === 'vendor' ? `Cancelled by the stall. Reason: ${order.statusReason || 'not given'}`
+            : `You cancelled this order${order.statusChangedAt ? ` at ${order.statusChangedAt.slice(11)}` : ''}. Its pickup place was released.`;
+      ui.hero.classList.toggle('is-cancelled', st.status !== 'COLLECTED');
+      ui.timer.setAttribute('aria-label', FINAL_TEXT[st.status]);
+      document.title = `${FINAL_TEXT[st.status]} · ${order.orderNumber}`;
+    } else if (st.status === 'READY') { chime(); confetti(ui.hero); }
     }
     lastStatus = st.status;
   }
@@ -133,8 +156,10 @@
   async function sync() {
     const { ok, data } = await api(`/api/orders/${encodeURIComponent(number)}`);
     if (ok && data.order) {
-      order = data.order;
-      myOrders.add(order);
+      // Keep this device's copy (and its student ID) in step with the server.
+      if (myOrders.find(data.order.orderNumber)) myOrders.update(data.order);
+      else myOrders.add(data.order);
+      order = myOrders.find(data.order.orderNumber) || data.order;
     }
     return ok;
   }
@@ -152,6 +177,10 @@
     render();
     tick();
     setInterval(tick, 1000);
+    // The vendor changes the status on the server: check now and every 10 seconds.
+    const poll = async () => { if (!Schedule.orderStatus(order, clock.read()).final) { await sync(); tick(); } };
+    poll();
+    setInterval(poll, 10000);
   }
   start();
 })();

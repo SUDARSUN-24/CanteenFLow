@@ -811,3 +811,61 @@ footer a:hover { color: #fff; }
   .stall-card, .dish, .map-section, .ribbons { animation: none !important; opacity: 1 !important; }
   .section-head h2::after, .page-head h1::after { transform: scaleX(1); transition: none; }
 }
+
+/* ---------- My orders: status, reasons and Cancel ---------- */
+.order-card { align-items: flex-start; flex-wrap: wrap; background: rgba(255, 255, 255, .93); }
+.order-main { flex: 1 1 220px; min-width: 0; }
+.order-num { font-weight: 800; font-size: 17px; text-decoration: none; color: var(--ink); }
+.order-num:hover { color: var(--brand); text-decoration: underline; }
+.order-sub { font-size: 14px; }
+.order-why { margin: 6px 0 0; font-size: 14px; }
+.order-why.vendor { background: var(--closed-soft); color: var(--closed); border-radius: 10px; padding: 6px 10px; }
+.order-side { display: grid; justify-items: end; gap: 6px; flex: none; }
+.order-total { font-weight: 800; }
+.order-card.status-cancelled, .order-card.status-no_show, .order-card.status-collected { opacity: .82; }
+.badge-done { background: #ecebe7; color: #4a463e; }
+.btn-danger { background: var(--closed); color: #fff; }
+.btn-danger:hover { background: #8c1c14; }
+.btn-danger-ghost { background: #fff; color: var(--closed); border-color: #f2b8b2; }
+.btn-danger-ghost:hover { background: var(--closed-soft); }
+.cancel-dialog .field { margin-top: 10px; }
+.cancel-dialog .error:not(:empty) { margin-top: 10px; background: var(--closed-soft); border-radius: 10px; padding: 8px 10px; }
+.confirm-hero.is-cancelled .timer .bar { stroke: var(--closed); }
+.confirm-hero.is-cancelled .status-pill { background: var(--closed-soft); color: var(--closed); }
+
+/* ---------- Vendor page ---------- */
+.vendor-login { max-width: 440px; display: grid; gap: 12px; }
+.vendor-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; background: rgba(255, 255, 255, .9);
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px; box-shadow: var(--shadow-sm); }
+.vendor-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.v-group { margin: 18px 0 6px; }
+.v-group h2 { font-size: 19px; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
+.v-count { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 99px; background: var(--brand-soft); color: var(--brand-dark); font-size: 13px; }
+.v-received .v-count { background: var(--accent); color: #2b1d00; }
+.v-help { margin: 0 0 8px; font-size: 14px; }
+.v-empty { margin: 4px 0 0; font-size: 14px; }
+.v-list { display: grid; gap: 10px; }
+.v-order { background: rgba(255, 255, 255, .95); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 6px; animation: fade-up .3s var(--ease) both; }
+.v-order.status-received { border-left: 5px solid var(--accent); }
+.v-order.status-preparing { border-left: 5px solid var(--brand); }
+.v-order.status-ready { border-left: 5px solid #2fb47e; }
+.v-order.status-cancelled, .v-order.status-no_show, .v-order.status-collected { opacity: .75; }
+.v-order-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.v-num { font-size: 17px; }
+.v-who { font-size: 14px; }
+.v-items { margin: 0; padding-left: 18px; font-size: 14.5px; }
+.v-note { margin: 0; font-size: 13.5px; background: var(--bg-warm); border-radius: 8px; padding: 5px 9px; }
+.v-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.v-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.v-menu-list { display: grid; gap: 8px; }
+.v-menu-item { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; background: rgba(255, 255, 255, .95); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer; }
+.v-state { font-size: 12.5px; font-weight: 800; padding: 2px 8px; border-radius: 99px; }
+.v-state.on { background: var(--open-soft); color: var(--open); }
+.v-state.off { background: var(--soldout-bg); color: var(--soldout-ink); }
+.switch { position: relative; width: 48px; height: 28px; flex: none; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.switch i { position: absolute; inset: 0; border-radius: 99px; background: #cfc5b3; transition: background .2s; pointer-events: none; }
+.switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s var(--ease); }
+.switch input:checked + i { background: var(--brand); }
+.switch input:checked + i::after { transform: translateX(20px); }
+.switch input:focus-visible + i { outline: 3px solid rgba(14, 122, 87, .4); outline-offset: 2px; }

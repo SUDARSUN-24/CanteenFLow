@@ -47,10 +47,33 @@
       const c = clock.read();
       return myOrders.all().find((o) => {
         const st = Schedule.orderStatus(o, c);
-        return !st.expired && st.status !== 'COLLECTED' && st.status !== 'CANCELLED';
+        return !st.expired && !st.final;
       }) || null;
     },
+    /** Replace the saved copy with the server's latest (status set by the vendor). Keeps the device-only student ID. */
+    update(order) {
+      const list = myOrders.all();
+      const i = list.findIndex((o) => o.orderNumber === order.orderNumber);
+      if (i < 0) return;
+      list[i] = { ...order, studentId: list[i].studentId };
+      write(MY_ORDERS_KEY, list);
+      tickHeader(); // the active-order bar shows the new status at once
+    },
+    /** Fetch the latest status of every saved order that is not finished yet. */
+    async refresh() {
+      const c = clock.read();
+      const open = myOrders.all().filter((o) => !Schedule.orderStatus(o, c).final);
+      await Promise.all(open.map(async (o) => {
+        const { ok, data } = await api(`/api/orders/${encodeURIComponent(o.orderNumber)}`);
+        if (ok && data.order) myOrders.update(data.order);
+      }));
+    },
   };
+
+  // ---------- business rules (from src/config.js on the server) ----------
+  let rulesPromise = null;
+  /** The rule numbers in force. Pages only use them to explain; the server enforces them. */
+  const rules = () => (rulesPromise ||= api('/api/config').then((r) => (r.ok ? r.data.rules : null)));
 
   async function api(path, options = {}) {
     let res;
@@ -118,7 +141,7 @@
     return el('span', { class: 'badge badge-closed' }, 'Closed');
   }
 
-  const STATUS_TEXT = { RECEIVED: 'Received', PREPARING: 'Preparing', READY: 'Ready for pickup', COLLECTED: 'Collected', CANCELLED: 'Cancelled' };
+  const STATUS_TEXT = { RECEIVED: 'Received', PREPARING: 'Preparing', READY: 'Ready for pickup', COLLECTED: 'Collected', CANCELLED: 'Cancelled', NO_SHOW: 'No-show' };
 
   // ---------- header, demo bar, footer ----------
   const ICON_CLOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
@@ -228,7 +251,8 @@
         el('p', {}, 'Stall names and buildings come from public sources. Prices, prep times, pickup slots and Sold Out states are demo data. ',
           el('a', { href: 'https://github.com/SUDARSUN-24/CanteenFLow/blob/main/data/SOURCES.md', target: '_blank', rel: 'noopener' }, 'Data sources'),
           ' · ', el('a', { href: '/map' }, 'Campus map'),
-          ' · ', el('a', { href: '/orders' }, 'My orders')),
+          ' · ', el('a', { href: '/orders' }, 'My orders'),
+          ' · ', el('a', { href: '/vendor' }, 'Vendor page')),
         el('p', { class: 'small' }, 'Map data © ', el('a', { href: 'https://www.openstreetmap.org/copyright', target: '_blank', rel: 'noopener' }, 'OpenStreetMap contributors'), '.')));
     document.body.append(footer);
 
@@ -236,6 +260,10 @@
     updateHeader();
     tickHeader();
     setInterval(tickHeader, 1000);
+    // The header's active-order bar follows the status the vendor sets.
+    const syncActive = () => { if (myOrders.active()) myOrders.refresh(); };
+    syncActive();
+    setInterval(syncActive, 30000);
     renderBackground();
     trackScroll(header);
     tagReveals();
@@ -340,6 +368,6 @@
     if (navigator.vibrate) navigator.vibrate([120, 80, 120]);
   }
 
-  window.CF = { store, myOrders, clock, api, el, toast, labelChip, stallBadge, STATUS_TEXT, updateHeader, openClockDialog, chime };
+  window.CF = { store, myOrders, clock, api, el, toast, labelChip, stallBadge, STATUS_TEXT, updateHeader, openClockDialog, chime, rules };
   renderChrome();
 })();

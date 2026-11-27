@@ -1,6 +1,13 @@
 // Order page (US-04 check and correct, US-05 place for a pickup time).
 (function () {
-  const { api, el, store, toast, myOrders } = CF;
+  const { api, el, store, toast, myOrders, rules } = CF;
+  let studentIdDigits = null; // from /api/config (src/config.js)
+  rules().then((r) => {
+    if (!r) return;
+    studentIdDigits = r.STUDENT_ID_DIGITS;
+    const hint = document.getElementById('studentId-hint');
+    if (hint) hint.textContent = `Demo: any ${r.STUDENT_ID_DIGITS} digits. Used to trace your order and apply the order limits.`;
+  });
   const DETAILS_KEY = 'canteenflow:details';
   const TOKEN_KEY = 'canteenflow:submitToken';
 
@@ -136,7 +143,7 @@
     const v = (f) => document.getElementById(f).value.trim();
     if (!v('name')) errs.name = 'Enter your name.';
     if (!v('studentId')) errs.studentId = 'Enter your student ID.';
-    else if (!/^[A-Za-z0-9]{1,20}$/.test(v('studentId'))) errs.studentId = 'Student ID must be 1–20 letters or digits.';
+    else if (studentIdDigits && !new RegExp(`^[0-9]{${studentIdDigits}}$`).test(v('studentId'))) errs.studentId = `Student ID must be exactly ${studentIdDigits} digits.`;
     if (!v('phone')) errs.phone = 'Enter your phone number.';
     else if (!/^[0-9+\-() ]{7,20}$/.test(v('phone')) || v('phone').replace(/\D/g, '').length < 7) errs.phone = 'Phone must have at least 7 digits.';
     if (!selectedSlot) errs.pickupSlotId = 'Choose a pickup time.';
@@ -223,7 +230,8 @@
         else localStorage.removeItem(DETAILS_KEY);
         sessionStorage.removeItem(TOKEN_KEY);
       } catch (err) { /* ignore */ }
-      myOrders.add(data.order);
+      // The student ID stays with the order on this device only, to cancel it later.
+      myOrders.add({ ...data.order, studentId: details.studentId });
       store.clear();
       location.href = `/confirm?n=${encodeURIComponent(data.order.orderNumber)}&new=1`;
       return;

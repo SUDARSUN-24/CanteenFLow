@@ -108,14 +108,14 @@ All research is in [data/SOURCES.md](data/SOURCES.md). In short:
 The live site is deployed with `vercel deploy --prod` from this folder (`vercel.json`). Static
 pages come from `public/`, and the API runs as one serverless function (`api/index.js`).
 
-**Database on the live site.** The code is ready for [Turso](https://turso.tech) (hosted SQLite,
-free Starter plan). When the Vercel project has `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`
-(Vercel → Storage → Turso), orders are saved in Turso, persist, and are shared by every server
+**Database on the live site.** The live site stores orders in [Turso](https://turso.tech)
+(hosted SQLite, free Starter plan, Tokyo region), connected through Vercel → Storage, which sets
+`TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`. Orders persist and are shared by every server
 copy. Placing an order runs in one write transaction (duplicate check, Sold Out check, slot
 capacity check and insert together), so two copies can never overbook a slot. A test fires six
 orders at once at a slot that holds three, and exactly three succeed.
 
-Without those variables the function falls back to a temporary SQLite file in `/tmp`, which is
+Without those variables (for example in a fork) the function falls back to a temporary SQLite file in `/tmp`, which is
 re-seeded when Vercel starts a new copy. Orders are then temporary on the live site, but the
 browser keeps its own copy, so the order tracker on that device always works.
 `GET /api/health` says which database is in use (`turso` or `local-file`).

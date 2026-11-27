@@ -4,7 +4,11 @@ const path = require('node:path');
 const express = require('express');
 const Schedule = require('../public/js/schedule');
 const { getStall, slotsFor, loadAll } = require('./data');
-const { placeOrder, getOrder, OrderError } = require('./orders');
+const config = require('./config');
+const {
+  placeOrder, getOrder, cancelOrder, vendorAction, vendorOrders, setItemAvailability, OrderError, VENDOR_ACTIONS,
+} = require('./orders');
+const vendor = require('./vendor');
 
 const TIME_RE = /^\d{2}:\d{2}$/;
 
@@ -13,7 +17,7 @@ const route = (fn) => async (req, res) => {
   try {
     await fn(req, res);
   } catch (err) {
-    if (err instanceof OrderError) return res.status(err.status).json({ error: err.message, fields: err.fields });
+    if (err instanceof OrderError) return res.status(err.status).json({ error: err.message, fields: err.fields, code: err.code || undefined });
     console.error(err);
     res.status(500).json({ error: 'Something went wrong on the server. Nothing was saved. Please try again.' });
   }
@@ -146,6 +150,53 @@ function createApp(dbOrPromise, { now = () => Date.now() } = {}) {
     const order = await getOrder(db, String(req.params.number).toUpperCase(), clockFor(req));
     if (!order) return res.status(404).json({ error: 'Order not found.' });
     res.json({ order });
+  }));
+
+  // A student cancels their own order (only while it is Received). Body: { studentId }.
+  app.post('/api/orders/:number/cancel', route(async (req, res) => {
+    const order = await cancelOrder(db, String(req.params.number).toUpperCase(), (req.body || {}).studentId, clockFor(req));
+    res.json({ order });
+  }));
+
+  // The business rules in force (from src/config.js), so pages can explain them.
+  app.get('/api/config', (req, res) => res.json({ rules: config }));
+
+  // ---- Vendor page (demo sign-in per stall; every call is limited to that stall) ----
+  app.get('/api/vendor/stalls', route(async (req, res) => {
+    const rows = await db.all('SELECT stall_id, name FROM stalls ORDER BY stall_id');
+    res.json({ stalls: rows.map((r) => ({ id: Number(r.stall_id), name: r.name })) });
+  }));
+
+  app.post('/api/vendor/login', route(async (req, res) => {
+    const { stallId, pin } = req.body || {};
+    res.json(await vendor.login(db, stallId, pin, now()));
+  }));
+
+  const asVendor = vendor.requireVendor(now);
+
+  app.get('/api/vendor/orders', asVendor, route(async (req, res) => {
+    const clock = clockFor(req);
+    const stall = await getStall(db, req.stallId);
+    res.json({ clock, stall: { id: stall.id, name: stall.name }, orders: await vendorOrders(db, req.stallId, clock) });
+  }));
+
+  // action: accept | reject | ready | collected | no_show | cancel. Body: { reason } for reject/cancel.
+  app.post('/api/vendor/orders/:number/:action', asVendor, route(async (req, res) => {
+    if (!Object.hasOwn(VENDOR_ACTIONS, req.params.action)) return res.status(400).json({ error: 'Unknown action.' });
+    const order = await vendorAction(db, req.stallId, String(req.params.number).toUpperCase(), req.params.action, (req.body || {}).reason, clockFor(req));
+    res.json({ order });
+  }));
+
+  app.get('/api/vendor/menu', asVendor, route(async (req, res) => {
+    const rows = await db.all('SELECT * FROM menu_items WHERE stall_id = ? ORDER BY menu_item_id', [req.stallId]);
+    res.json({
+      menu: rows.map((m) => ({ id: Number(m.menu_item_id), name: m.name, nameTh: m.name_th, category: m.category, price: Number(m.price), isAvailable: Boolean(m.is_available) })),
+    });
+  }));
+
+  // Sold Out switch. Body: { available: true | false }.
+  app.post('/api/vendor/menu/:id/availability', asVendor, route(async (req, res) => {
+    res.json({ item: await setItemAvailability(db, req.stallId, req.params.id, (req.body || {}).available) });
   }));
 
   // Which database is in use (for checking the live setup; never shows secrets).
